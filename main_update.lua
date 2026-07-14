@@ -19,6 +19,8 @@ import "android.provider.Settings"
 import "android.app.ActivityManager"
 import "android.view.WindowManager"
 
+local player = MediaPlayer()
+
 local System_Utils = require "CheckSystem.System_Utils"
 local FPS_Controller = require "CheckSystem.FPS_Controller"
 
