@@ -1,6 +1,3 @@
--- ==========================================
--- SECTION 1: IMPORTS & INITIALIZATION
--- ==========================================
 require "import"
 import "android.widget.*"
 import "android.view.*"
@@ -11,158 +8,453 @@ import "android.media.MediaPlayer"
 import "android.content.Context"
 import "android.content.Intent"
 import "android.content.IntentFilter"
+import "android.graphics.drawable.BitmapDrawable"
 import "android.os.BatteryManager"
 import "android.media.AudioManager"
 import "android.os.Build"
+import "java.util.logging.Handler"
 import "android.os.Handler"
 import "android.provider.Settings"
+import "android.net.Uri"
+import "android.app.NotificationManager"
 import "android.app.ActivityManager"
-import "android.view.WindowManager"
-
-local player = MediaPlayer()
+import "android.widget.LinearLayout"
 
 local System_Utils = require "CheckSystem.System_Utils"
 local FPS_Controller = require "CheckSystem.FPS_Controller"
 
--- ==========================================
--- SECTION 2: SYSTEM & OVERLAY SETUP (ย้ายขึ้นมาไว้บนเพื่อให้ฟังก์ชันอื่นเรียกใช้ได้)
--- ==========================================
-local windowManager = activity.getSystemService(Context.WINDOW_SERVICE)
-local triggerParams = WindowManager.LayoutParams(-2, -2, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 8, -3)
-triggerParams.gravity = 3 | 16
+local status, boosterModule = pcall(require, "booster")
+if status then
+  _G.myBooster = boosterModule
+ else
+  print("Error: หาไฟล์ booster.lua ไม่เจอ")
+end
+
+
+_G.fps_manager = {
+  currentTarget = 60,
+  currentDisplayFPS = 60 -- นี่คือค่าที่จะโชว์จริงๆ
+}
+
+
+function updateFPSValue()
+  local target = _G.fps_manager.currentTarget
+  local variation = FPS_Controller.getVariation(target)
+  _G.fps_manager.currentDisplayFPS = target - variation
+end
+
+-- ใน main.lua
+isGameModeActive = false -- เพิ่มตัวแปรนี้ไว้บนสุด
+-- 1. ตัวแปรสถานะ (ใช้ i ตัวเล็ก ตามที่คุณใช้ในปุ่ม)
+isOptionOpen = false
+-- 2. สร้าง Root Layout
+local rootLayout = LinearLayout(activity)
+rootLayout.setLayoutParams(LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
+rootLayout.setOrientation(LinearLayout.VERTICAL)
+
+-- 3. การใส่รูปพื้นหลังแบบที่ปลอดภัย (ต้องมี pcall หรือเช็คไฟล์ก่อน)
+local bgPath = activity.getLuaDir() .. "/res/bg.png"
+rootLayout.setBackgroundDrawable(BitmapDrawable(loadbitmap(bgPath)))
+
+activity.setContentView(rootLayout)
+
+-- [[ ตั้งค่าตัวแปรระบบหลัก ]]
+local windowManager = activity.getSystemService(activity.WINDOW_SERVICE)
+local audioManager = activity.getSystemService(activity.AUDIO_SERVICE)
+local notificationManager = activity.getSystemService(activity.NOTIFICATION_SERVICE)
+local activityManager = activity.getSystemService(activity.ACTIVITY_SERVICE)
+
+-- [[ ฟังก์ชันแปลงค่า dp เป็น px ]]
+local function dip2px(dpValue)
+  local density = activity.getResources().getDisplayMetrics().density
+  return math.ceil(dpValue * density)
+end
+
+local isSidebarOpen = false
+local lastNotifiedBattery = 100
+local isGameModeActive = false -- เพิ่มตัวแปรเช็คสถานะโหมดเกมส์
+local isDNDActive = false
+local isBoostActive = false
+
+local player = MediaPlayer()
+
+
+-- [[ ฟังก์ชันเล่นไฟล์เสียงโหมดเกมส์ ]]
+local function playGameModeSound()
+  local success, err = pcall(function()
+    local player = MediaPlayer()
+    player.reset()
+    player.setDataSource(activity.getLuaDir().."/gamesmode.mp3")
+    player.prepare()
+    player.start()
+  end)
+  if not success then
+    Toast.makeText(activity, "🔊 เล่นเสียงล้มเหลว (เช็คชื่อไฟล์เสียงอีกครั้ง)", Toast.LENGTH_SHORT).show()
+  end
+end
+
+-- [[ ตรรกะตรวจสอบและขอสิทธิ์หน้าต่างลอย ]]
+if Build.VERSION.SDK_INT >= 23 then
+  if not Settings.canDrawOverlays(activity) then
+    Toast.makeText(activity, "🔒 กรุณาเปิดสิทธิ์ 'แสดงทับแอปอื่นๆ' ตามขั้นตอนแนะนำก่อนนะครับ", Toast.LENGTH_LONG).show()
+    local intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+    intent.setData(Uri.parse("package:" .. activity.getPackageName()))
+    activity.startActivity(intent)
+    activity.finish()
+    return
+  end
+end
+
+
+-- [[ 1. สร้างปุ่มติ่งขอบสำหรับกดเปิด Sidebar ]]
+local triggerParams = WindowManager.LayoutParams(
+WindowManager.LayoutParams.WRAP_CONTENT,
+WindowManager.LayoutParams.WRAP_CONTENT,
+WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+PixelFormat.TRANSLUCENT
+)
+triggerParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
+triggerParams.x = 0
+triggerParams.y = 0
 
 local triggerButton = Button(activity)
 triggerButton.setText("▶")
+triggerButton.setTextColor(0xFFFFFFFF)
+triggerButton.setTextSize(12)
+local triggerBg = GradientDrawable()
+triggerBg.setColor(0x80E53E3E)
+triggerBg.setCornerRadii({0, 0, 15, 15, 15, 15, 0, 0})
+triggerButton.setBackgroundDrawable(triggerBg)
+triggerButton.setPadding(10, 30, 20, 30)
 
--- ==========================================
--- SECTION 3: FUNCTIONS & HELPERS
--- ==========================================
-local function dip2px(dpValue) return math.ceil(dpValue * activity.getResources().getDisplayMetrics().density) end
-
+-- [[ 2. ฟังก์ชันช่วยสร้างปุ่มทั่วไปและอัปเดต UI ]]
 local function createMenuButton(btnText)
   local btn = Button(activity)
   btn.setText(btnText)
   btn.setTextColor(0xFFFFFFFF)
   btn.setTextSize(14)
   btn.setHeight(dip2px(45))
-  local lp = LinearLayout.LayoutParams(-1, -2)
+
+  local lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
   lp.setMargins(0, 0, 0, dip2px(12))
   btn.setLayoutParams(lp)
   return btn
 end
 
-local function updateButtonState(btn, isActive, activeText, inactiveText)
+-- ฟังก์ชันช่วยสร้างปุ่มให้หน้าตาเหมือนปุ่มอื่นๆ ในแอป
+local function createStyledButton(text)
+  local btn = Button(activity)
+  btn.setText(text)
+  btn.setTextColor(0xFFFFFFFF)
+  btn.setTextSize(16)
+
+  -- ตั้งค่า Background ให้เหมือนปุ่มพัดลม/โหมดเกม (สมมติว่าคุณใช้ drawable หรือ background สไตล์นี้)
   local btnBg = GradientDrawable()
-  if isActive then
-    btn.setText(activeText); btnBg.setColor(0xFFE53E3E); btnBg.setCornerRadius(10); btnBg.setStroke(2, 0xFFFFFFFF)
+  btnBg.setColor(0xFF262626) -- สีพื้นหลังปุ่ม
+  btnBg.setCornerRadius(8)
+  btnBg.setStroke(2, 0xFFE53E3E) -- ขอบปุ่ม
+  btn.setBackgroundDrawable(btnBg)
+
+  btn.setGravity(Gravity.CENTER)
+  -- ตั้งค่า Margin ให้ปุ่มมีระยะห่างเหมือนปุ่มอื่น
+  local lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+  lp.setMargins(0, 0, 0, 15) -- ห่างด้านล่าง 15dp
+  btn.setLayoutParams(lp)
+
+  return btn
+end
+
+
+-- ✨ เพิ่มฟังก์ชันอัปเดต UI ปุ่มโหมดเกมส์ให้เหมือนเพื่อนๆ
+local function updateGameModeButtonUI(btn)
+  local btnBg = GradientDrawable()
+  if isGameModeActive then
+    btn.setText("🚀 โหมดเกมส์: เปิด")
+    btnBg.setColor(0xFFE53E3E)
+    btnBg.setCornerRadius(10)
+    btnBg.setStroke(2, 0xFFFFFFFF)
    else
-    btn.setText(inactiveText); btnBg.setColor(0xFF262626); btnBg.setCornerRadius(10); btnBg.setStroke(2, 0x40E53E3E)
+    btn.setText("🚀 โหมดเกมส์: ปิด")
+    btnBg.setColor(0xFF262626)
+    btnBg.setCornerRadius(10)
+    btnBg.setStroke(2, 0x40E53E3E)
   end
   btn.setBackgroundDrawable(btnBg)
 end
 
--- ==========================================
--- SECTION 4: UI LAYOUT
--- ==========================================
-local isSidebarOpen, isGameModeActive, isDNDActive, isBoostActive = false, false, false, false
-local lastNotifiedBattery = 100
+local function updateDndButtonUI(btn)
+  local btnBg = GradientDrawable()
+  if isDNDActive then
+    btn.setText("🔕 ห้ามรบกวน: เปิด")
+    btnBg.setColor(0xFFE53E3E)
+    btnBg.setCornerRadius(10)
+    btnBg.setStroke(2, 0xFFFFFFFF)
+   else
+    btn.setText("🔔 ห้ามรบกวน: ปิด")
+    btnBg.setColor(0xFF262626)
+    btnBg.setCornerRadius(10)
+    btnBg.setStroke(2, 0x40E53E3E)
+  end
+  btn.setBackgroundDrawable(btnBg)
+end
 
--- ประกาศ View ไว้นอก loadlayout เพื่อให้เรียกใช้ได้ทั่วถึง
-local txt_battery = TextView(activity)
-local txt_temp = TextView(activity)
-local txt_fps = TextView(activity)
+local function updateBoostButtonUI(btn)
+  local btnBg = GradientDrawable()
+  if isBoostActive then
+    btn.setText("🚀 เร่งความเร็ว: เปิด")
+    btnBg.setColor(0xFFE53E3E)
+    btnBg.setCornerRadius(10)
+    btnBg.setStroke(2, 0xFFFFFFFF)
+   else
+    btn.setText("🧹 เร่งความเร็ว: ปิด")
+    btnBg.setColor(0xFF262626)
+    btnBg.setCornerRadius(10)
+    btnBg.setStroke(2, 0x40E53E3E)
+  end
+  btn.setBackgroundDrawable(btnBg)
+end
 
+local sidebarParams = WindowManager.LayoutParams(
+dip2px(185), -- ปรับให้กว้างขึ้นเป็น 220
+WindowManager.LayoutParams.MATCH_PARENT,
+WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+PixelFormat.TRANSLUCENT
+)
+sidebarParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
+sidebarParams.windowAnimations = android.R.style.Animation_Toast
+
+-- ปุ่มระบบ
+local btn_minimize = Button(activity)
+btn_minimize.setText("🔽 ยุบแถบสถานะ")
+btn_minimize.setTextColor(0xFFFFFFFF)
+btn_minimize.setTextSize(13)
+local minBg = GradientDrawable()
+minBg.setColor(0xFF4A5568)
+minBg.setCornerRadius(10)
+btn_minimize.setBackgroundDrawable(minBg)
+local minLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dip2px(45))
+minLp.setMargins(0, 0, 0, dip2px(12))
+btn_minimize.setLayoutParams(minLp)
+
+local btn_close_permanent = Button(activity)
+btn_close_permanent.setText("🛑 ปิดใช้งานถาวร")
+btn_close_permanent.setTextColor(0xFFFFFFFF)
+btn_close_permanent.setTextSize(13)
+local closeBg = GradientDrawable()
+closeBg.setColor(0xFFE53E3E)
+closeBg.setCornerRadius(10)
+btn_close_permanent.setBackgroundDrawable(closeBg)
+local closeLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dip2px(45))
+closeLp.setMargins(0, 0, 0, dip2px(12))
+btn_close_permanent.setLayoutParams(closeLp)
+
+
+-- [[ 3. โครงสร้างแถบสไลด์ยาว (Sidebar Layout) ปรับปรุงใหม่ ]]
 local sidebarView = loadlayout({
-  LinearLayout, id="sidebar_main", orientation="vertical", width="fill", height="fill",
+  LinearLayout, id="sidebar_main", orientation="vertical", layout_width="fill", layout_height="fill",
   backgroundColor="#FA1A1A1A", padding="12dp",
+
+  -- ส่วนหัวและสถานะ
   { TextView, text="🎮 GAMES MODE", textSize="18sp", textColor="#FFFFFF", layout_marginBottom="10dp" },
-  { LinearLayout, id="status_panel", orientation="vertical", width="fill", padding="10dp",
+  { LinearLayout, id="status_panel", orientation="vertical", layout_width="fill", padding="10dp",
     { TextView, id="txt_battery", text="🔋 แบตเตอรี่: --%", textColor="#FFFFFF" },
     { TextView, id="txt_temp", text="🌡️ อุณหภูมิ: --°C", textColor="#FFFFFF" },
-    { TextView, id="txt_fps", text="🎮 FPS: --", textColor="#FFFFFF" }
+    { TextView, id="txt_fps", text="🎮 FPS: --", textColor="#FFFFFF", textSize="14sp" }
   },
-  { ScrollView, width="fill", height="0dp", layout_weight="1",
-    { LinearLayout, id="button_container", orientation="vertical", width="fill" }
+
+  -- 1. ส่วนปุ่มที่เลื่อนได้ (ScrollView) ใช้ layout_weight="1" เพื่อดันปุ่มล่างสุดลงไป
+  {
+    ScrollView,
+    layout_width="fill",
+    layout_height="0dp", -- ใช้ 0dp ร่วมกับ weight เพื่อความแม่นยำ
+    layout_weight="1",
+    {
+      LinearLayout, id="button_container", orientation="vertical", layout_width="fill",
+      -- จะเหลือแค่ปุ่มฟังก์ชันต่างๆ ที่เลื่อนได้
+    }
   },
-  { View, height="2dp", backgroundColor="#33FFFFFF", layout_margin="10dp" },
-  { LinearLayout, id="system_button_container", orientation="vertical", width="fill" }
+
+  -- 2. ส่วนปุ่มที่ตรึงไว้ด้านล่าง (Fixed)
+  { View, layout_height="2dp", backgroundColor="#33FFFFFF", layout_margin="10dp" },
+  { LinearLayout, id="system_button_container", orientation="vertical", layout_width="fill" }
+  -- ส่วน future_section_container ถ้าไม่ได้ใช้งานให้ตัดออกไปได้ครับ
 })
 
--- ดึง View ที่ประกาศไว้มาใช้งาน
-local button_container = sidebarView.findViewById(R.id.button_container)
-local system_button_container = sidebarView.findViewById(R.id.system_button_container)
-local txt_battery = sidebarView.findViewById(R.id.txt_battery)
-local txt_temp = sidebarView.findViewById(R.id.txt_temp)
-local txt_fps = sidebarView.findViewById(R.id.txt_fps)
+-- วางโค้ดนี้ต่อจากบรรทัด loadlayout {...}) ได้เลยครับ
+local statusBg = GradientDrawable()
+statusBg.setColor(0xFF161616)
+statusBg.setCornerRadius(8)
+statusBg.setStroke(1, 0x20FFFFFF)
 
--- ==========================================
--- SECTION 5: LOGIC & MANAGEMENT (คำสั่งเปิด-ปิด)
--- ==========================================
-local sidebarParams = WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 8, -3)
-
-local function openSidebar()
-  if not isSidebarOpen then
-    windowManager.addView(sidebarView, sidebarParams)
-    windowManager.removeView(triggerButton)
-    isSidebarOpen = true
-  end
+-- ตรวจสอบก่อนเรียกใช้งานเพื่อความปลอดภัย (Safety Check)
+if status_panel then
+  status_panel.setBackgroundDrawable(statusBg)
 end
 
-local function minimizeSidebar()
-  if isSidebarOpen then
-    windowManager.removeView(sidebarView)
-    windowManager.addView(triggerButton, triggerParams)
-    isSidebarOpen = false
-  end
+if txt_fps then
+  txt_fps.setText("🎮 FPS: 60")
 end
 
--- เรียกใช้งานส่วน logic ปุ่มและระบบตามที่คุณมีอยู่เดิม (วางต่อจากจุดนี้)
--- ... [ใส่ตรรกะปุ่มที่คุณมี เช่น btn_dnd, btn_boost และอื่นๆ ตามไฟล์ต้นฉบับได้เลย] ...
--- 1. ประกาศตัวแปร Global/Local ที่จำเป็นต้องใช้
-local audioManager = activity.getSystemService(Context.AUDIO_SERVICE)
-local activityManager = activity.getSystemService(Context.ACTIVITY_SERVICE)
+-- สร้าง Container เก็บปุ่มที่ต้องการให้พับได้
+local extra_container = LinearLayout(activity)
+extra_container.setOrientation(LinearLayout.VERTICAL)
+extra_container.setVisibility(View.GONE) -- เริ่มต้นให้ซ่อนไว้
 
--- 2. สร้างปุ่มต่างๆ ที่ต้องใช้ใน Logic
-local btn_dnd = createMenuButton("🔕 ห้ามรบกวน (ปิด)")
-local btn_boost = createMenuButton("🚀 เคลียร์แรม")
-local btn_aimbot = createMenuButton("🎯 Aimbot (ปิด)")
-local btn_changeAim = createMenuButton("⚙️ ตั้งค่าเป้า")
-local btn_minimize = createMenuButton("🔽 ยุบเมนู")
-local btn_close_permanent = createMenuButton("❌ ปิดถาวร")
-
--- 3. ฟังก์ชันอัปเดต UI ปุ่มที่เหลือ (ถ้ายังไม่มี ให้ใส่ฟังก์ชันนี้ไว้ใน SECTION 2)
-function updateDndButtonUI(btn)
-  updateButtonState(btn, isDNDActive, "🔕 ห้ามรบกวน (เปิด)", "🔕 ห้ามรบกวน (ปิด)")
-end
-function updateBoostButtonUI(btn)
-  updateButtonState(btn, isBoostActive, "🚀 กำลังเร่งความเร็ว...", "🚀 เคลียร์แรม")
-end
-
-
--- สร้างปุ่มต่างๆ
-local btn_gamemode = createMenuButton("🚀 โหมดเกมส์: ปิด")
-local btnSystem = createMenuButton("💾 System")
-local btn_test_option = createMenuButton("🛠️ ตั่งค่าอื่นๆ")
+-- สร้างปุ่มสวิตช์ฟังก์ชันเสริม
 local btn_extra_toggle = createMenuButton("➕ ฟังก์ชันเสริม (ปิด)")
-local extra_container = LinearLayout(activity); extra_container.setOrientation(1); extra_container.setVisibility(8)
+local toggleBg = GradientDrawable()
+toggleBg.setColor(0xFF4A5568) -- สีเทา
+toggleBg.setCornerRadius(10)
+btn_extra_toggle.setBackgroundDrawable(toggleBg)
 
--- Logic ต่างๆ (ใส่ Logic เดิมของคุณที่นี่)
-local gm = require "gamemode_control"
-btn_gamemode.setOnClickListener(function()
-  isGameModeActive = not isGameModeActive
-  gm.toggle(activity, isGameModeActive, nil)
-  updateButtonState(btn_gamemode, isGameModeActive, "🚀 โหมดเกมส์: เปิด", "🚀 โหมดเกมส์: ปิด")
+btn_extra_toggle.setOnClickListener(function()
+  if extra_container.getVisibility() == View.GONE then
+    extra_container.setVisibility(View.VISIBLE)
+    btn_extra_toggle.setText("➖ ฟังก์ชันเสริม (เปิด)")
+   else
+    extra_container.setVisibility(View.GONE)
+    btn_extra_toggle.setText("➕ ฟังก์ชันเสริม (ปิด)")
+  end
 end)
 
--- (ต่อด้วยการ addView ปุ่มทั้งหมดเข้า container เหมือนโค้ดเดิมของคุณ)
+-- 1. สร้างปุ่มให้ครบก่อน (วางไว้ก่อนที่จะสั่ง addView)
+local btn_gamemode = createMenuButton("🚀 โหมดเกมส์: ปิด")
+-- 1. สร้างปุ่ม System (วางต่อจากปุ่ม boo!st ได้เลย)
+local btnSystem = Button(activity)
+btnSystem.setText("💾 System")
+btnSystem.setTextColor(0xFFFFFFFF)
+btnSystem.setTextSize(14)
+btnSystem.setHeight(dip2px(45)) -- กำหนดความสูงให้เท่ากับปุ่มอื่น
+
+-- สร้างกรอบสีแดงตามที่คุณต้องการ
+local bgSystem = GradientDrawable()
+bgSystem.setColor(0x00000000)
+bgSystem.setStroke(2, 0xFFFF0000)
+bgSystem.setCornerRadius(10)
+btnSystem.setBackgroundDrawable(bgSystem)
+
+-- ตัวแปรสถานะ
+local isSystemOn = false
+
+btnSystem.setOnClickListener(function()
+  isSystemOn = not isSystemOn
+  print("DEBUG: กำลังเรียก toggleStats สถานะ: " .. tostring(isSystemOn)) -- เพิ่มบรรทัดนี้
+
+  if isSystemOn then
+    bgSystem.setColor(0x40FF0000)
+   else
+    bgSystem.setColor(0x00000000)
+  end
+
+  require("overlay_manager").toggleStats(activity, isSystemOn)
+end)
+
+-- สร้างและตั้งค่าปุ่ม "🛠️ ตั่งค่าอื่นๆ" ในที่เดียว
+local btn_test_option = createStyledButton("🛠️ ตั่งค่าอื่นๆ")
+
+btn_test_option.setOnClickListener(function(v)
+  if not isOptionOpen then
+    local opt = require "option"
+    opt.showOptionUI(activity)
+    isOptionOpen = true
+   else
+    -- กรณีต้องการให้กดปิดเมนูได้ด้วย ให้ใส่โค้ดปิดที่นี่ เช่น opt.hideOptionUI(activity)
+    isOptionOpen = false
+  end
+end)
+
+-- สร้างเส้นคั่นสำหรับคั่นระหว่าง สถานะ กับ ปุ่มโหมดเกมส์
+local separator_top = View(activity)
+separator_top.setLayoutParams(LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dip2px(2)))
+separator_top.setBackgroundColor(0x33FFFFFF)
+local sepLpTop = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dip2px(2))
+sepLpTop.setMargins(0, dip2px(10), 0, dip2px(10))
+separator_top.setLayoutParams(sepLpTop)
+
+-- แอดเส้นคั่นตัวใหม่นี้เข้า Container เป็นอันดับแรกสุด
+button_container.addView(separator_top)
+
+-- 2. เมื่อสร้างเสร็จแล้ว ค่อยสั่ง addView
 button_container.addView(btn_gamemode)
 button_container.addView(btnSystem)
 button_container.addView(btn_test_option)
+
+-- สร้างเส้นคั่น (Separator)
+local separator = View(activity)
+separator.setLayoutParams(LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dip2px(2)))
+separator.setBackgroundColor(0x33FFFFFF) -- สีขาวโปร่งใส
+local sepLp = separator.getLayoutParams()
+sepLp.setMargins(0, dip2px(10), 0, dip2px(10)) -- เว้นระยะห่างบนล่าง
+separator.setLayoutParams(sepLp)
+
+-- !!! ต้องเพิ่มบรรทัดนี้ เพื่อให้เส้นแสดงผลใน Container !!!
+button_container.addView(separator)
+
+-- 3. ตามด้วยปุ่มเปิด-ปิดฟังก์ชันเสริม
 button_container.addView(btn_extra_toggle)
 button_container.addView(extra_container)
 
--- [ ส่วนระบบอื่นๆ เช่น music, macro, aimbot ให้เรียกใช้ที่นี่ได้เลย ]
--- ตัวอย่าง: extra_container.addView(ปุ่มต่างๆ...)
+-- 1. สร้างปุ่มให้ครบทุกปุ่มก่อน (ประกาศตัวแปรให้เรียบร้อย)
+local btn_dnd = createMenuButton("🔔 ห้ามรบกวน: ปิด")
+local btn_boost = createMenuButton("🧹 เร่งความเร็ว: ปิด")
+
+-- สร้างฟังก์ชันเปลี่ยนสีปุ่ม (ใส่ไว้ช่วงบนๆ ของไฟล์ร่วมกับฟังก์ชันอื่นๆ)
+local function updateButtonState(btn, isActive, activeText, inactiveText)
+  local btnBg = GradientDrawable()
+  if isActive then
+    btn.setText(activeText)
+    btnBg.setColor(0xFFE53E3E) -- สีแดงเมื่อเปิด (เข้ากับธีม)
+    btnBg.setCornerRadius(10)
+    btnBg.setStroke(2, 0xFFFFFFFF)
+   else
+    btn.setText(inactiveText)
+    btnBg.setColor(0xFF262626) -- สีเข้มเมื่อปิด
+    btnBg.setCornerRadius(10)
+    btnBg.setStroke(2, 0x40E53E3E)
+  end
+  btn.setBackgroundDrawable(btnBg)
+end
+
+-- --- ส่วนการสร้างปุ่มเป้าเล็ง ---
+local btn_aimbot = createMenuButton("🎯 เป้ากลางจอ: ปิด")
+updateButtonState(btn_aimbot, false, "🎯 เป้ากลางจอ: เปิด", "🎯 เป้ากลางจอ: ปิด") -- ตั้งค่าเริ่มต้น
+
+btn_aimbot.setOnClickListener(function()
+  local isNowActive = aimbotControl.toggle()
+  updateButtonState(btn_aimbot, isNowActive, "🎯 เป้ากลางจอ: เปิด", "🎯 เป้ากลางจอ: ปิด")
+end)
+
+
+-- ปุ่มเปลี่ยนเป้า.
+local btn_changeAim = createMenuButton("🔄 เปลี่ยนเป้าเล็ง")
+btn_changeAim.setOnClickListener(function()
+  local newIndex = aimbotControl.nextAim()
+  Toast.makeText(activity, "เปลี่ยนเป็นเป้าที่ " .. newIndex, Toast.LENGTH_SHORT).show()
+end)
+
+
+
+-- สั่งเรียกฟังก์ชันอัปเดตสถานะเริ่มต้นให้ครบทุกปุ่มรวมถึงโหมดเกมส์ด้วย ✨
+updateGameModeButtonUI(btn_gamemode)
+updateDndButtonUI(btn_dnd)
+updateBoostButtonUI(btn_boost)
+
+local gm = require "gamemode_control"
+
+-- [[ 4. ปรับแก้ตรรกะปุ่มโหมดเกมส์ให้ถูกต้อง ]]
+btn_gamemode.setOnClickListener(function(v)
+  -- 1. สลับสถานะ (ถ้าเป็นเท็จให้เป็นจริง ถ้าเป็นจริงให้เป็นเท็จ)
+  isGameModeActive = not isGameModeActive
+
+  -- 2. เรียกฟังก์ชัน toggle โดยส่งค่าสถานะล่าสุดไป
+  gm.toggle(activity, isGameModeActive, rootLayout)
+
+  -- 3. อัปเดต UI ปุ่มทันที
+  updateGameModeButtonUI(btn_gamemode)
+end)
+
 -- [[ ตรรกะปุ่มห้ามรบกวน (นำโค้ดไปวางแทนของเดิมในส่วนนี้) ]]
 btn_dnd.setOnClickListener(function(v)
   -- 1. ตรวจสอบสิทธิ์ก่อนทำงาน
@@ -234,21 +526,21 @@ extra_container.addView(btn_changeAim)
 -- 1. ฟังก์ชันสแกนหาโฟลเดอร์ Music อัตโนมัติ
 local musicList = {}
 local function scanMusicFolders()
-  musicList = {}
-  local roots = {"/sdcard/", "/storage/"} -- ค้นหาในทั้งสองแหล่ง
-  for _, root in ipairs(roots) do
-    local cmd = "find " .. root .. " -type d -name 'Music' 2>/dev/null"
-    local f = io.popen(cmd)
-    for folder in f:lines() do
-      local files = io.popen("ls " .. folder .. "/*.mp3 2>/dev/null")
-      for file in files:lines() do
-        table.insert(musicList, file)
-      end
-      files:close()
+    musicList = {}
+    local roots = {"/sdcard/", "/storage/"} -- ค้นหาในทั้งสองแหล่ง
+    for _, root in ipairs(roots) do
+        local cmd = "find " .. root .. " -type d -name 'Music' 2>/dev/null"
+        local f = io.popen(cmd)
+        for folder in f:lines() do
+            local files = io.popen("ls " .. folder .. "/*.mp3 2>/dev/null")
+            for file in files:lines() do
+                table.insert(musicList, file)
+            end
+            files:close()
+        end
+        f:close()
     end
-    f:close()
-  end
-  table.sort(musicList) -- เรียง A-Z / ก-ฮ
+    table.sort(musicList) -- เรียง A-Z / ก-ฮ
 end
 
 -- 2. สร้าง UI กรอบสีเขียวโปร่งแสง
@@ -302,53 +594,53 @@ button_container.addView(musicPanel) -- แอด panel เข้า container �
 local totalTimeSeconds = 0
 local startTime = 0
 -- ตัวแปรสถานะสำหรับการเล่นเพลง
-local isPlaying = false
+local isPlaying = false 
 
 -- เปลี่ยนจาก setOnCheckedChangeListener เป็น setOnClickListener
 btn_music_control.setOnClickListener(function(v)
-  isPlaying = not isPlaying
+    isPlaying = not isPlaying
+    
+    if isPlaying then
+        -- เปลี่ยนสีปุ่มเป็นสีฟ้าเมื่อกดเล่น
+        btnControlBg.setColor(0xFF2196F3)
+        btn_music_control.setBackgroundDrawable(btnControlBg)
+        
+        -- สแกนและเล่นเพลง
+        Thread(function()
+            scanMusicFolders()
+            if #musicList > 0 then
+                pcall(function()
+                    player.reset()
+                    player.setDataSource(musicList[1])
+                    player.prepare()
+                    player.start()
+                end)
+                
+                activity.runOnUiThread(function()
+                    startTime = os.time()
+                    txt_status.setText(string.format("กำลังเล่น: %s", musicList[1]:match("([^/]+)$")))
+                end)
+            end
+        end).start()
+        
+    else
+        -- เปลี่ยนสีปุ่มเป็นสีเทาเมื่อหยุด
+        btnControlBg.setColor(0xFF4A5568)
+        btn_music_control.setBackgroundDrawable(btnControlBg)
+        
+        -- หยุดเล่นเพลง
+        if player.isPlaying() then
+            player.stop()
+        end
+        
+        local endTime = os.time()
+        totalTimeSeconds = totalTimeSeconds + (endTime - startTime)
 
-  if isPlaying then
-    -- เปลี่ยนสีปุ่มเป็นสีฟ้าเมื่อกดเล่น
-    btnControlBg.setColor(0xFF2196F3)
-    btn_music_control.setBackgroundDrawable(btnControlBg)
-
-    -- สแกนและเล่นเพลง
-    Thread(function()
-      scanMusicFolders()
-      if #musicList > 0 then
-        pcall(function()
-          player.reset()
-          player.setDataSource(musicList[1])
-          player.prepare()
-          player.start()
-        end)
-
-        activity.runOnUiThread(function()
-          startTime = os.time()
-          txt_status.setText(string.format("กำลังเล่น: %s", musicList[1]:match("([^/]+)$")))
-        end)
-      end
-    end).start()
-
-   else
-    -- เปลี่ยนสีปุ่มเป็นสีเทาเมื่อหยุด
-    btnControlBg.setColor(0xFF4A5568)
-    btn_music_control.setBackgroundDrawable(btnControlBg)
-
-    -- หยุดเล่นเพลง
-    if player.isPlaying() then
-      player.stop()
+        local h = math.floor(totalTimeSeconds / 3600)
+        local m = math.floor((totalTimeSeconds % 3600) / 60)
+        local s = totalTimeSeconds % 60
+        txt_status.setText(string.format("จำนวน: %d เพลง\nสถานะ: หยุดพัก\nฟังไปแล้ว: %02d:%02d:%02d", #musicList, h, m, s))
     end
-
-    local endTime = os.time()
-    totalTimeSeconds = totalTimeSeconds + (endTime - startTime)
-
-    local h = math.floor(totalTimeSeconds / 3600)
-    local m = math.floor((totalTimeSeconds % 3600) / 60)
-    local s = totalTimeSeconds % 60
-    txt_status.setText(string.format("จำนวน: %d เพลง\nสถานะ: หยุดพัก\nฟังไปแล้ว: %02d:%02d:%02d", #musicList, h, m, s))
-  end
 end)
 
 local Check_System = require "CheckSystem.Check_System"
@@ -426,7 +718,6 @@ local batteryReceiver = LuaBroadcastReceiver(function(context, intent)
 end)
 
 activity.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-local sidebarParams = WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 8, -3)
 
 -- [[ 6. ตรรกะจัดการระบบ เปิด - ยุบ - ปิดถาวร ]]
 local function openSidebar()
@@ -462,21 +753,30 @@ local function closePermanent()
   activity.finish()
 end
 
--- สำหรับปุ่มเปิด-ปิดที่สร้างไว้ใน SECTION 2:
-triggerButton.setOnClickListener(function() openSidebar() end)
-windowManager.addView(triggerButton, triggerParams)
-
--- อัปเดต FPS counter (เรียกใช้หลัง setup เสร็จ)
-local handler = Handler()
+-- ใน main.lua
 local function startFakeFPSCounter()
-  handler.post(Runnable({
+  local handler = Handler()
+  local runnable
+  -- ใน main.lua ฟังก์ชัน startFakeFPSCounter
+  runnable = Runnable({
     run = function()
       if isSidebarOpen then
-        local variation = FPS_Controller.getVariation(60)
-        txt_fps.setText("🎮 FPS: " .. (60 - variation))
+        updateFPSValue() -- สั่งสุ่มเลขใหม่ที่นี่ก่อนโชว์
+        if txt_fps then
+          txt_fps.setText("🎮 FPS: " .. _G.fps_manager.currentDisplayFPS)
+        end
       end
-      handler.postDelayed(Runnable({run=function() startFakeFPSCounter() end}), 2000)
+      handler.postDelayed(runnable, 2000)
     end
-  }))
+  })
+  handler.post(runnable)
 end
+
+-- เรียกฟังก์ชันนี้หลังจาก setup ทุกอย่างเสร็จแล้ว
 startFakeFPSCounter()
+
+triggerButton.setOnClickListener(function(v) openSidebar() end)
+btn_minimize.setOnClickListener(function(v) minimizeSidebar() end)
+btn_close_permanent.setOnClickListener(function(v) closePermanent() end)
+
+windowManager.addView(triggerButton, triggerParams)
