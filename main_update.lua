@@ -11,31 +11,29 @@ import "android.media.MediaPlayer"
 import "android.content.Context"
 import "android.content.Intent"
 import "android.content.IntentFilter"
-import "android.graphics.drawable.BitmapDrawable"
 import "android.os.BatteryManager"
 import "android.media.AudioManager"
 import "android.os.Build"
 import "android.os.Handler"
 import "android.provider.Settings"
-import "android.net.Uri"
-import "android.app.NotificationManager"
 import "android.app.ActivityManager"
+import "android.view.WindowManager"
 
 local System_Utils = require "CheckSystem.System_Utils"
 local FPS_Controller = require "CheckSystem.FPS_Controller"
 
-local status, boosterModule = pcall(require, "booster")
-if status then _G.myBooster = boosterModule end
+-- ==========================================
+-- SECTION 2: SYSTEM & OVERLAY SETUP (ย้ายขึ้นมาไว้บนเพื่อให้ฟังก์ชันอื่นเรียกใช้ได้)
+-- ==========================================
+local windowManager = activity.getSystemService(Context.WINDOW_SERVICE)
+local triggerParams = WindowManager.LayoutParams(-2, -2, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 8, -3)
+triggerParams.gravity = 3 | 16
 
-_G.fps_manager = {currentTarget = 60, currentDisplayFPS = 60}
-function updateFPSValue()
-  local target = _G.fps_manager.currentTarget
-  local variation = FPS_Controller.getVariation(target)
-  _G.fps_manager.currentDisplayFPS = target - variation
-end
+local triggerButton = Button(activity)
+triggerButton.setText("▶")
 
 -- ==========================================
--- SECTION 2: FUNCTIONS & HELPERS
+-- SECTION 3: FUNCTIONS & HELPERS
 -- ==========================================
 local function dip2px(dpValue) return math.ceil(dpValue * activity.getResources().getDisplayMetrics().density) end
 
@@ -62,11 +60,15 @@ local function updateButtonState(btn, isActive, activeText, inactiveText)
 end
 
 -- ==========================================
--- SECTION 3: UI LAYOUT
+-- SECTION 4: UI LAYOUT
 -- ==========================================
-local player = MediaPlayer()
-local isSidebarOpen, isGameModeActive, isDNDActive, isBoostActive, isOptionOpen = false, false, false, false, false
+local isSidebarOpen, isGameModeActive, isDNDActive, isBoostActive = false, false, false, false
 local lastNotifiedBattery = 100
+
+-- ประกาศ View ไว้นอก loadlayout เพื่อให้เรียกใช้ได้ทั่วถึง
+local txt_battery = TextView(activity)
+local txt_temp = TextView(activity)
+local txt_fps = TextView(activity)
 
 local sidebarView = loadlayout({
   LinearLayout, id="sidebar_main", orientation="vertical", width="fill", height="fill",
@@ -84,10 +86,36 @@ local sidebarView = loadlayout({
   { LinearLayout, id="system_button_container", orientation="vertical", width="fill" }
 })
 
--- ==========================================
--- SECTION 4: LOGIC & BUTTON SETUP
--- ==========================================
+-- ดึง View ที่ประกาศไว้มาใช้งาน
+local button_container = sidebarView.findViewById(R.id.button_container)
+local system_button_container = sidebarView.findViewById(R.id.system_button_container)
+local txt_battery = sidebarView.findViewById(R.id.txt_battery)
+local txt_temp = sidebarView.findViewById(R.id.txt_temp)
+local txt_fps = sidebarView.findViewById(R.id.txt_fps)
 
+-- ==========================================
+-- SECTION 5: LOGIC & MANAGEMENT (คำสั่งเปิด-ปิด)
+-- ==========================================
+local sidebarParams = WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 8, -3)
+
+local function openSidebar()
+  if not isSidebarOpen then
+    windowManager.addView(sidebarView, sidebarParams)
+    windowManager.removeView(triggerButton)
+    isSidebarOpen = true
+  end
+end
+
+local function minimizeSidebar()
+  if isSidebarOpen then
+    windowManager.removeView(sidebarView)
+    windowManager.addView(triggerButton, triggerParams)
+    isSidebarOpen = false
+  end
+end
+
+-- เรียกใช้งานส่วน logic ปุ่มและระบบตามที่คุณมีอยู่เดิม (วางต่อจากจุดนี้)
+-- ... [ใส่ตรรกะปุ่มที่คุณมี เช่น btn_dnd, btn_boost และอื่นๆ ตามไฟล์ต้นฉบับได้เลย] ...
 -- 1. ประกาศตัวแปร Global/Local ที่จำเป็นต้องใช้
 local audioManager = activity.getSystemService(Context.AUDIO_SERVICE)
 local activityManager = activity.getSystemService(Context.ACTIVITY_SERVICE)
@@ -108,10 +136,6 @@ function updateBoostButtonUI(btn)
   updateButtonState(btn, isBoostActive, "🚀 กำลังเร่งความเร็ว...", "🚀 เคลียร์แรม")
 end
 
--- ต่อด้วยส่วนเดิมของคุณ:
-local button_container = sidebarView.getChildAt(2).getChildAt(0)
-local system_button_container = sidebarView.getChildAt(4)
--- (แล้วตามด้วยคำสั่งสร้างปุ่มและตรรกะเดิมของคุณ...)
 
 -- สร้างปุ่มต่างๆ
 local btn_gamemode = createMenuButton("🚀 โหมดเกมส์: ปิด")
@@ -436,45 +460,21 @@ local function closePermanent()
   activity.finish()
 end
 
--- ใน main.lua
+-- สำหรับปุ่มเปิด-ปิดที่สร้างไว้ใน SECTION 2:
+triggerButton.setOnClickListener(function() openSidebar() end)
+windowManager.addView(triggerButton, triggerParams)
+
+-- อัปเดต FPS counter (เรียกใช้หลัง setup เสร็จ)
+local handler = Handler()
 local function startFakeFPSCounter()
-  local handler = Handler()
-  local runnable
-  -- ใน main.lua ฟังก์ชัน startFakeFPSCounter
-  runnable = Runnable({
+  handler.post(Runnable({
     run = function()
       if isSidebarOpen then
-        updateFPSValue() -- สั่งสุ่มเลขใหม่ที่นี่ก่อนโชว์
-        if txt_fps then
-          txt_fps.setText("🎮 FPS: " .. _G.fps_manager.currentDisplayFPS)
-        end
+        local variation = FPS_Controller.getVariation(60)
+        txt_fps.setText("🎮 FPS: " .. (60 - variation))
       end
-      handler.postDelayed(runnable, 2000)
+      handler.postDelayed(Runnable({run=function() startFakeFPSCounter() end}), 2000)
     end
-  })
-  handler.post(runnable)
+  }))
 end
-
--- เรียกฟังก์ชันนี้หลังจาก setup ทุกอย่างเสร็จแล้ว
 startFakeFPSCounter()
-
-triggerButton.setOnClickListener(function(v) openSidebar() end)
-btn_minimize.setOnClickListener(function(v) minimizeSidebar() end)
-btn_close_permanent.setOnClickListener(function(v) closePermanent() end)
-
--- ==========================================
--- SECTION 5: SYSTEM & OVERLAY
--- ==========================================
-local windowManager = activity.getSystemService(Context.WINDOW_SERVICE)
-local triggerParams = WindowManager.LayoutParams(-2, -2, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 8, -3)
-triggerParams.gravity = 3 | 16
-
-local triggerButton = Button(activity)
-triggerButton.setText("▶")
-
--- ใช้ฟังก์ชัน openSidebar ที่เราประกาศไว้ใน SECTION 4 แทน[span_1](start_span)[span_1](end_span)
-triggerButton.setOnClickListener(function()
-  openSidebar() 
-end)
-
-windowManager.addView(triggerButton, triggerParams)
