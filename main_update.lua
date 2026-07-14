@@ -1,4 +1,4 @@
-
+require "import"
 import "android.widget.*"
 import "android.view.*"
 import "android.graphics.PixelFormat"
@@ -298,9 +298,7 @@ if txt_fps then
 end
 
 -- สร้าง Container เก็บปุ่มที่ต้องการให้พับได้
-local extra_container = LinearLayout(activity)
-extra_container.setOrientation(LinearLayout.VERTICAL)
-extra_container.setVisibility(View.GONE) -- เริ่มต้นให้ซ่อนไว้
+
 
 -- สร้างปุ่มสวิตช์ฟังก์ชันเสริม
 local btn_extra_toggle = createMenuButton("➕ ฟังก์ชันเสริม (ปิด)")
