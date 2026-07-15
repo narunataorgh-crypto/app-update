@@ -417,6 +417,10 @@ local function updateButtonState(btn, isActive, activeText, inactiveText)
   btn.setBackgroundDrawable(btnBg)
 end
 
+-- 1. เรียกใช้งานหลังจาก require "AllGames" แล้ว
+local aimbot = require "aimbot"
+local aimbotControl = aimbot.setup(activity, dip2px, WindowManager, PixelFormat, Gravity)
+
 -- --- ส่วนการสร้างปุ่มเป้าเล็ง ---
 local btn_aimbot = createMenuButton("🎯 เป้ากลางจอ: ปิด")
 updateButtonState(btn_aimbot, false, "🎯 เป้ากลางจอ: เปิด", "🎯 เป้ากลางจอ: ปิด") -- ตั้งค่าเริ่มต้น
@@ -526,21 +530,21 @@ extra_container.addView(btn_changeAim)
 -- 1. ฟังก์ชันสแกนหาโฟลเดอร์ Music อัตโนมัติ
 local musicList = {}
 local function scanMusicFolders()
-    musicList = {}
-    local roots = {"/sdcard/", "/storage/"} -- ค้นหาในทั้งสองแหล่ง
-    for _, root in ipairs(roots) do
-        local cmd = "find " .. root .. " -type d -name 'Music' 2>/dev/null"
-        local f = io.popen(cmd)
-        for folder in f:lines() do
-            local files = io.popen("ls " .. folder .. "/*.mp3 2>/dev/null")
-            for file in files:lines() do
-                table.insert(musicList, file)
-            end
-            files:close()
-        end
-        f:close()
+  musicList = {}
+  local roots = {"/sdcard/", "/storage/"} -- ค้นหาในทั้งสองแหล่ง
+  for _, root in ipairs(roots) do
+    local cmd = "find " .. root .. " -type d -name 'Music' 2>/dev/null"
+    local f = io.popen(cmd)
+    for folder in f:lines() do
+      local files = io.popen("ls " .. folder .. "/*.mp3 2>/dev/null")
+      for file in files:lines() do
+        table.insert(musicList, file)
+      end
+      files:close()
     end
-    table.sort(musicList) -- เรียง A-Z / ก-ฮ
+    f:close()
+  end
+  table.sort(musicList) -- เรียง A-Z / ก-ฮ
 end
 
 -- 2. สร้าง UI กรอบสีเขียวโปร่งแสง
@@ -594,53 +598,53 @@ button_container.addView(musicPanel) -- แอด panel เข้า container �
 local totalTimeSeconds = 0
 local startTime = 0
 -- ตัวแปรสถานะสำหรับการเล่นเพลง
-local isPlaying = false 
+local isPlaying = false
 
 -- เปลี่ยนจาก setOnCheckedChangeListener เป็น setOnClickListener
 btn_music_control.setOnClickListener(function(v)
-    isPlaying = not isPlaying
-    
-    if isPlaying then
-        -- เปลี่ยนสีปุ่มเป็นสีฟ้าเมื่อกดเล่น
-        btnControlBg.setColor(0xFF2196F3)
-        btn_music_control.setBackgroundDrawable(btnControlBg)
-        
-        -- สแกนและเล่นเพลง
-        Thread(function()
-            scanMusicFolders()
-            if #musicList > 0 then
-                pcall(function()
-                    player.reset()
-                    player.setDataSource(musicList[1])
-                    player.prepare()
-                    player.start()
-                end)
-                
-                activity.runOnUiThread(function()
-                    startTime = os.time()
-                    txt_status.setText(string.format("กำลังเล่น: %s", musicList[1]:match("([^/]+)$")))
-                end)
-            end
-        end).start()
-        
-    else
-        -- เปลี่ยนสีปุ่มเป็นสีเทาเมื่อหยุด
-        btnControlBg.setColor(0xFF4A5568)
-        btn_music_control.setBackgroundDrawable(btnControlBg)
-        
-        -- หยุดเล่นเพลง
-        if player.isPlaying() then
-            player.stop()
-        end
-        
-        local endTime = os.time()
-        totalTimeSeconds = totalTimeSeconds + (endTime - startTime)
+  isPlaying = not isPlaying
 
-        local h = math.floor(totalTimeSeconds / 3600)
-        local m = math.floor((totalTimeSeconds % 3600) / 60)
-        local s = totalTimeSeconds % 60
-        txt_status.setText(string.format("จำนวน: %d เพลง\nสถานะ: หยุดพัก\nฟังไปแล้ว: %02d:%02d:%02d", #musicList, h, m, s))
+  if isPlaying then
+    -- เปลี่ยนสีปุ่มเป็นสีฟ้าเมื่อกดเล่น
+    btnControlBg.setColor(0xFF2196F3)
+    btn_music_control.setBackgroundDrawable(btnControlBg)
+
+    -- สแกนและเล่นเพลง
+    Thread(function()
+      scanMusicFolders()
+      if #musicList > 0 then
+        pcall(function()
+          player.reset()
+          player.setDataSource(musicList[1])
+          player.prepare()
+          player.start()
+        end)
+
+        activity.runOnUiThread(function()
+          startTime = os.time()
+          txt_status.setText(string.format("กำลังเล่น: %s", musicList[1]:match("([^/]+)$")))
+        end)
+      end
+    end).start()
+
+   else
+    -- เปลี่ยนสีปุ่มเป็นสีเทาเมื่อหยุด
+    btnControlBg.setColor(0xFF4A5568)
+    btn_music_control.setBackgroundDrawable(btnControlBg)
+
+    -- หยุดเล่นเพลง
+    if player.isPlaying() then
+      player.stop()
     end
+
+    local endTime = os.time()
+    totalTimeSeconds = totalTimeSeconds + (endTime - startTime)
+
+    local h = math.floor(totalTimeSeconds / 3600)
+    local m = math.floor((totalTimeSeconds % 3600) / 60)
+    local s = totalTimeSeconds % 60
+    txt_status.setText(string.format("จำนวน: %d เพลง\nสถานะ: หยุดพัก\nฟังไปแล้ว: %02d:%02d:%02d", #musicList, h, m, s))
+  end
 end)
 
 local Check_System = require "CheckSystem.Check_System"
@@ -668,11 +672,6 @@ if status == "supported" then
     Toast.makeText(activity, "เครื่องไม่รองรับการปรับรีเฟรชเรท", Toast.LENGTH_SHORT).show()
   end)
 end
-
--- 1. เรียกใช้งานหลังจาก require "AllGames" แล้ว
-local aimbot = require "aimbot"
-local aimbotControl = aimbot.setup(activity, dip2px, WindowManager, PixelFormat, Gravity)
-
 
 
 local macro = require "macro"
