@@ -128,6 +128,12 @@ triggerBg.setCornerRadii({0, 0, 15, 15, 15, 15, 0, 0})
 triggerButton.setBackgroundDrawable(triggerBg)
 triggerButton.setPadding(10, 30, 20, 30)
 
+
+-- 1. เรียกใช้งานหลังจาก require "AllGames" แล้ว
+local aimbot = require "aimbot"
+local aimbotControl = aimbot.setup(activity, dip2px, WindowManager, PixelFormat, Gravity)
+
+
 -- [[ 2. ฟังก์ชันช่วยสร้างปุ่มทั่วไปและอัปเดต UI ]]
 local function createMenuButton(btnText)
   local btn = Button(activity)
@@ -417,27 +423,32 @@ local function updateButtonState(btn, isActive, activeText, inactiveText)
   btn.setBackgroundDrawable(btnBg)
 end
 
--- 1. เรียกใช้งานหลังจาก require "AllGames" แล้ว
-local aimbot = require "aimbot"
-local aimbotControl = aimbot.setup(activity, dip2px, WindowManager, PixelFormat, Gravity)
 
 -- --- ส่วนการสร้างปุ่มเป้าเล็ง ---
 local btn_aimbot = createMenuButton("🎯 เป้ากลางจอ: ปิด")
-updateButtonState(btn_aimbot, false, "🎯 เป้ากลางจอ: เปิด", "🎯 เป้ากลางจอ: ปิด") -- ตั้งค่าเริ่มต้น
+updateButtonState(btn_aimbot, false, "🎯 เป้ากลางจอ: เปิด", "🎯 เป้ากลางจอ: ปิด")
 
 btn_aimbot.setOnClickListener(function()
-  local isNowActive = aimbotControl.toggle()
-  updateButtonState(btn_aimbot, isNowActive, "🎯 เป้ากลางจอ: เปิด", "🎯 เป้ากลางจอ: ปิด")
+  -- เพิ่มการเช็ค nil
+  if aimbotControl then
+    local isNowActive = aimbotControl.toggle()
+    updateButtonState(btn_aimbot, isNowActive, "🎯 เป้ากลางจอ: เปิด", "🎯 เป้ากลางจอ: ปิด")
+   else
+    Toast.makeText(activity, "⚠️ ระบบเป้าเล็งยังไม่พร้อม", Toast.LENGTH_SHORT).show()
+  end
 end)
 
-
--- ปุ่มเปลี่ยนเป้า.
+-- ปุ่มเปลี่ยนเป้า
 local btn_changeAim = createMenuButton("🔄 เปลี่ยนเป้าเล็ง")
 btn_changeAim.setOnClickListener(function()
-  local newIndex = aimbotControl.nextAim()
-  Toast.makeText(activity, "เปลี่ยนเป็นเป้าที่ " .. newIndex, Toast.LENGTH_SHORT).show()
+  -- เพิ่มการเช็ค nil
+  if aimbotControl then
+    local newIndex = aimbotControl.nextAim()
+    Toast.makeText(activity, "เปลี่ยนเป็นเป้าที่ " .. newIndex, Toast.LENGTH_SHORT).show()
+   else
+    Toast.makeText(activity, "⚠️ ระบบเป้าเล็งยังไม่พร้อม", Toast.LENGTH_SHORT).show()
+  end
 end)
-
 
 
 -- สั่งเรียกฟังก์ชันอัปเดตสถานะเริ่มต้นให้ครบทุกปุ่มรวมถึงโหมดเกมส์ด้วย ✨
