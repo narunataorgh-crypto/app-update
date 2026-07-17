@@ -471,47 +471,42 @@ updateBoostButtonUI(btn_boost)
 local function loadGameModeModule()
   local githubUrl = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
   
-  -- ใช้ตัวแปรเก็บค่าภายนอก Thread
-  local loadedModule = nil
-  
-  -- สร้าง Thread เพื่อดึงข้อมูล
-  local thread = Thread(function()
-    local ok, content = pcall(function()
-      -- ใช้ Http.get ของระบบที่เสถียรกว่า หรือการดึงผ่าน URL
-      local u = java.net.URL(githubUrl)
-      local conn = u.openConnection()
-      conn.setConnectTimeout(3000)
-      local reader = java.io.BufferedReader(java.io.InputStreamReader(conn.getInputStream()))
-      local sb = java.lang.StringBuilder()
-      local line
-      while true do
-        line = reader.readLine()
-        if not line then break end
-        sb.append(line).append("\n")
-      end
-      return tostring(sb.toString())
-    end)
-    
-    if ok and content then
-      loadedModule = load(content)()
-      print("DEBUG: Loaded from GitHub Successfully")
-     else
-      print("DEBUG: GitHub Load Failed, falling back to Local")
+  -- ใช้ pcall เพื่อกันไม่ให้แอปเด้งถ้าเน็ตมีปัญหา
+  local status, code = pcall(function()
+    local url = java.net.URL(githubUrl)
+    local conn = url.openConnection()
+    conn.setConnectTimeout(3000) -- รอไม่เกิน 3 วิ
+    conn.setReadTimeout(3000)
+    local reader = java.io.BufferedReader(java.io.InputStreamReader(conn.getInputStream()))
+    local sb = java.lang.StringBuilder()
+    local line
+    while true do
+      line = reader.readLine()
+      if not line then break end
+      sb.append(line).append("\n")
     end
+    reader.close()
+    return tostring(sb.toString())
   end)
-  
-  thread.start()
-  thread.join(4000) -- รอสูงสุด 4 วินาที
-  
-  if loadedModule then
-    return loadedModule
-   else
-    return require "gamemode_control"
+
+  if status and code and #code > 0 then
+    local func, err = load(code)
+    if func then
+      print("DEBUG: Loaded from GitHub")
+      return func()
+    else
+      print("DEBUG ERROR (load): " .. tostring(err))
+    end
   end
+
+  -- ถ้าโหลดจากเน็ตไม่ผ่าน ให้โหลดจาก Local
+  print("DEBUG: Loading from Local")
+  return require "gamemode_control"
 end
 
-  - เรียกใช้
+-- รับค่าให้มั่นใจ
 local gm = loadGameModeModule()
+
 
 
 -- [[ ตรรกะปุ่มห้ามรบกวน (นำโค้ดไปวางแทนของเดิมในส่วนนี้) ]]
