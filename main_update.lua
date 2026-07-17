@@ -475,20 +475,22 @@ updateBoostButtonUI(btn_boost)
 
 function loadGameModeModule()
   local url = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
-  local localPath = activity.getLuaDir() .. "/gamemode_control.lua" -- ตำแหน่งไฟล์ในเครื่อง
+  local localPath = activity.getLuaDir() .. "/gamemode_control.lua"
 
   Http.get(url, function(code, content)
-    if code == 200 then
+    -- ตรวจสอบว่า content ที่โหลดมามีข้อมูลจริงๆ (ไม่ใช่ไฟล์ว่าง)
+    if code == 200 and content and #content > 0 then
       local func, err = load(content)
       if func then
         _G.gm = func()
         print("DEBUG: Loaded from GitHub successfully")
       else
-        print("DEBUG ERROR: Load string failed, trying local file...")
+        print("DEBUG ERROR: Load string failed, fallback to local")
         loadLocalFallback(localPath)
       end
     else
-      print("DEBUG: GitHub connection failed (Code: " .. tostring(code) .. "), trying local file...")
+      -- ถ้าเน็ตมีปัญหา หรือไฟล์ว่าง ให้ใช้ไฟล์ในเครื่องทันที
+      print("DEBUG: GitHub failed or empty, fallback to local")
       loadLocalFallback(localPath)
     end
   end)
@@ -501,10 +503,10 @@ function loadLocalFallback(path)
     if status then
       _G.gm = res
       print("DEBUG: Loaded from local storage successfully")
-    else
+     else
       print("DEBUG ERROR: Failed to load local file")
     end
-  else
+   else
     print("DEBUG ERROR: No local gamemode file found!")
   end
 end
