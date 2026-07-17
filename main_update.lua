@@ -474,25 +474,22 @@ local function loadGameModeModule()
   -- พยายามโหลดจาก GitHub
   local code = Http.get(githubUrl)
   if code and #code > 0 then
-    local status, result = pcall(load(code))
-    if status then
+    local func, err = load(code)
+    if func then
       print("DEBUG: Loaded from GitHub")
-      return result
+      return func() -- รันไฟล์ GitHub แล้วคืนค่า Table ออกมา
+    else
+      print("DEBUG ERROR: " .. tostring(err))
     end
   end
 
-  -- ถ้าพลาด ให้โหลดจากเครื่อง
+  -- ถ้าพลาด ให้โหลดจากเครื่อง (ใช้วิธี require แบบปกติ)
   print("DEBUG: Loading from Local")
   return require "gamemode_control"
 end
 
 -- รับค่ากลับมาให้มั่นใจ
 local gm = loadGameModeModule()
-
--- เช็คก่อนใช้ทุกครั้ง
-if not gm then
-  print("ERROR: ไม่สามารถโหลดโมดูล gamemode ได้เลย!")
-end
 
 
 
