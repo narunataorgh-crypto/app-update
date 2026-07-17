@@ -468,40 +468,25 @@ updateGameModeButtonUI(btn_gamemode)
 updateDndButtonUI(btn_dnd)
 updateBoostButtonUI(btn_boost)
 
-local function loadGameModeModule()
-  local githubUrl = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
+-- เปลี่ยนฟังก์ชัน loadGameModeModule ให้เป็นรูปแบบนี้
+function loadGameModeModule()
+  local url = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
   
-  -- ใช้ pcall เพื่อกันไม่ให้แอปเด้งถ้าเน็ตมีปัญหา
-  local status, code = pcall(function()
-    local url = java.net.URL(githubUrl)
-    local conn = url.openConnection()
-    conn.setConnectTimeout(3000) -- รอไม่เกิน 3 วิ
-    conn.setReadTimeout(3000)
-    local reader = java.io.BufferedReader(java.io.InputStreamReader(conn.getInputStream()))
-    local sb = java.lang.StringBuilder()
-    local line
-    while true do
-      line = reader.readLine()
-      if not line then break end
-      sb.append(line).append("\n")
-    end
-    reader.close()
-    return tostring(sb.toString())
-  end)
-
-  if status and code and #code > 0 then
-    local func, err = load(code)
-    if func then
-      print("DEBUG: Loaded from GitHub")
-      return func()
+  -- ใช้ Http.get แบบ Callback เพื่อดึงโค้ด Lua มาจาก GitHub
+  Http.get(url, function(code, content)
+    if code == 200 then
+      -- ถ้าโหลดสำเร็จ ให้รันโค้ดนั้นผ่าน load()
+      local func, err = load(content)
+      if func then
+        print("DEBUG: Loaded from GitHub successfully")
+        return func() -- คืนค่า Module ที่โหลดมา
+      else
+        print("DEBUG ERROR: Syntax Error in Module: " .. tostring(err))
+      end
     else
-      print("DEBUG ERROR (load): " .. tostring(err))
+      print("DEBUG: Loading from Local (Failed with code: " .. tostring(code) .. ")")
     end
-  end
-
-  -- ถ้าโหลดจากเน็ตไม่ผ่าน ให้โหลดจาก Local
-  print("DEBUG: Loading from Local")
-  return require "gamemode_control"
+  end)
 end
 
 -- รับค่าให้มั่นใจ
