@@ -396,6 +396,7 @@ function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
       onCompletion = function(mp)
         -- วิดีโอเล่นจบ ให้คืนค่าแถบระบบกลับมาและโชว์หน้า Launcher
         decorView.setSystemUiVisibility(0)
+        mp.release()
         showLauncherUI(activity, rootLayout)
       end
     }))
