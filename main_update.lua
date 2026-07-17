@@ -456,19 +456,33 @@ updateGameModeButtonUI(btn_gamemode)
 updateDndButtonUI(btn_dnd)
 updateBoostButtonUI(btn_boost)
 
-local gm = require "gamemode_control"
+-- โค้ดดึงไฟล์จาก GitHub หรือ Local
+local function loadGameModeModule()
+  local githubUrl = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
+  
+  -- 1. พยายามโหลดจาก GitHub
+  local success, result = pcall(function()
+    local code = io.popen("curl -s " .. githubUrl):read("*a")
+    if code and code ~= "" then
+      return assert(load(code))()
+    else
+      error("Empty from GitHub")
+    end
+  end)
 
--- [[ 4. ปรับแก้ตรรกะปุ่มโหมดเกมส์ให้ถูกต้อง ]]
-btn_gamemode.setOnClickListener(function(v)
-  -- 1. สลับสถานะ (ถ้าเป็นเท็จให้เป็นจริง ถ้าเป็นจริงให้เป็นเท็จ)
-  isGameModeActive = not isGameModeActive
+  -- 2. ถ้า GitHub ไม่สำเร็จ ให้โหลดจากไฟล์ในเครื่อง (Local)
+  if not success then
+    print("DEBUG: GitHub load failed, falling back to Local file.")
+    return require "gamemode_control"
+  else
+    print("DEBUG: GitHub loaded successfully.")
+    return result
+  end
+end
 
-  -- 2. เรียกฟังก์ชัน toggle โดยส่งค่าสถานะล่าสุดไป
-  gm.toggle(activity, isGameModeActive, rootLayout)
+-- เรียกใช้ฟังก์ชันนี้แทน require เดิม
+local gm = loadGameModeModule()
 
-  -- 3. อัปเดต UI ปุ่มทันที
-  updateGameModeButtonUI(btn_gamemode)
-end)
 
 -- [[ ตรรกะปุ่มห้ามรบกวน (นำโค้ดไปวางแทนของเดิมในส่วนนี้) ]]
 btn_dnd.setOnClickListener(function(v)
@@ -790,3 +804,4 @@ btn_minimize.setOnClickListener(function(v) minimizeSidebar() end)
 btn_close_permanent.setOnClickListener(function(v) closePermanent() end)
 
 windowManager.addView(triggerButton, triggerParams)
+
