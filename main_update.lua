@@ -387,13 +387,17 @@ button_container.addView(btn_gamemode)
 button_container.addView(btnSystem)
 button_container.addView(btn_test_option)
 
--- นำโค้ดนี้วางตรงนี้ครับ:
 btn_gamemode.setOnClickListener(function(v)
+  -- เช็คว่า gm โหลดมาหรือยัง
+  if not gm then
+    Toast.makeText(activity, "⏳ กำลังโหลดข้อมูลโหมดเกมส์... กรุณารอสักครู่", Toast.LENGTH_SHORT).show()
+    return
+  end
+
   isGameModeActive = not isGameModeActive
   updateGameModeButtonUI(btn_gamemode)
 
   if gm and gm.toggle then
-    -- เพิ่ม activity และ rootLayout เข้าไปเพื่อให้ทำงานได้สมบูรณ์
     gm.toggle(activity, isGameModeActive, rootLayout)
     Toast.makeText(activity, isGameModeActive and "🚀 เปิดโหมดเกมส์แล้ว" or "🚀 ปิดโหมดเกมส์แล้ว", Toast.LENGTH_SHORT).show()
   end
@@ -468,18 +472,18 @@ updateGameModeButtonUI(btn_gamemode)
 updateDndButtonUI(btn_dnd)
 updateBoostButtonUI(btn_boost)
 
--- เปลี่ยนฟังก์ชัน loadGameModeModule ให้เป็นรูปแบบนี้
+-- ประกาศตัวแปร gm ไว้นอกสุดก่อน
+local gm = nil
+
 function loadGameModeModule()
   local url = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
   
-  -- ใช้ Http.get แบบ Callback เพื่อดึงโค้ด Lua มาจาก GitHub
   Http.get(url, function(code, content)
     if code == 200 then
-      -- ถ้าโหลดสำเร็จ ให้รันโค้ดนั้นผ่าน load()
       local func, err = load(content)
       if func then
+        gm = func() -- เก็บโมดูลที่โหลดได้ลงในตัวแปร gm
         print("DEBUG: Loaded from GitHub successfully")
-        return func() -- คืนค่า Module ที่โหลดมา
       else
         print("DEBUG ERROR: Syntax Error in Module: " .. tostring(err))
       end
@@ -489,9 +493,8 @@ function loadGameModeModule()
   end)
 end
 
--- รับค่าให้มั่นใจ
-local gm = loadGameModeModule()
-
+-- สั่งโหลดเริ่มต้น
+loadGameModeModule()
 
 
 -- [[ ตรรกะปุ่มห้ามรบกวน (นำโค้ดไปวางแทนของเดิมในส่วนนี้) ]]
