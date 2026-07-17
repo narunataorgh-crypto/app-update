@@ -471,39 +471,46 @@ updateBoostButtonUI(btn_boost)
 local function loadGameModeModule()
   local githubUrl = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
   
-  -- ใช้ Java URL เข้ามาช่วยแทน Http ของแอป
-  local status, code = pcall(function()
-    local url = java.net.URL(githubUrl)
-    local conn = url.openConnection()
-    conn.setConnectTimeout(5000)
-    conn.setReadTimeout(5000)
-    local reader = java.io.BufferedReader(java.io.InputStreamReader(conn.getInputStream()))
-    local sb = java.lang.StringBuilder()
-    local line
-    while true do
-      line = reader.readLine()
-      if not line then break end
-      sb.append(line).append("\n")
+  -- ใช้ตัวแปรเก็บค่าภายนอก Thread
+  local loadedModule = nil
+  
+  -- สร้าง Thread เพื่อดึงข้อมูล
+  local thread = Thread(function()
+    local ok, content = pcall(function()
+      -- ใช้ Http.get ของระบบที่เสถียรกว่า หรือการดึงผ่าน URL
+      local u = java.net.URL(githubUrl)
+      local conn = u.openConnection()
+      conn.setConnectTimeout(3000)
+      local reader = java.io.BufferedReader(java.io.InputStreamReader(conn.getInputStream()))
+      local sb = java.lang.StringBuilder()
+      local line
+      while true do
+        line = reader.readLine()
+        if not line then break end
+        sb.append(line).append("\n")
+      end
+      return tostring(sb.toString())
+    end)
+    
+    if ok and content then
+      loadedModule = load(content)()
+      print("DEBUG: Loaded from GitHub Successfully")
+     else
+      print("DEBUG: GitHub Load Failed, falling back to Local")
     end
-    reader.close()
-    return tostring(sb.toString())
   end)
-
-  if status and code and #code > 0 then
-    local func, err = load(code)
-    if func then
-      print("DEBUG: Loaded from GitHub (via Java)")
-      return func()
-    else
-      print("DEBUG ERROR: " .. tostring(err))
-    end
+  
+  thread.start()
+  thread.join(4000) -- รอสูงสุด 4 วินาที
+  
+  if loadedModule then
+    return loadedModule
+   else
+    return require "gamemode_control"
   end
-
-  print("DEBUG: Loading from Local")
-  return require "gamemode_control"
 end
 
--- เรียกใช้
+  - เรียกใช้
 local gm = loadGameModeModule()
 
 
