@@ -471,27 +471,41 @@ updateBoostButtonUI(btn_boost)
 local function loadGameModeModule()
   local githubUrl = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
   
-  -- ใช้ pcall ครอบเพื่อป้องกัน Error ของ Http.get
-  local status, code = pcall(function() return Http.get(githubUrl) end)
-  
-  -- ตรวจสอบว่า status เป็น true และ code มีข้อมูลจริง
+  -- ใช้ Java URL เข้ามาช่วยแทน Http ของแอป
+  local status, code = pcall(function()
+    local url = java.net.URL(githubUrl)
+    local conn = url.openConnection()
+    conn.setConnectTimeout(5000)
+    conn.setReadTimeout(5000)
+    local reader = java.io.BufferedReader(java.io.InputStreamReader(conn.getInputStream()))
+    local sb = java.lang.StringBuilder()
+    local line
+    while true do
+      line = reader.readLine()
+      if not line then break end
+      sb.append(line).append("\n")
+    end
+    reader.close()
+    return tostring(sb.toString())
+  end)
+
   if status and code and #code > 0 then
     local func, err = load(code)
     if func then
-      print("DEBUG: Loaded from GitHub")
-      return func() -- รันโค้ดและส่งค่ากลับ
+      print("DEBUG: Loaded from GitHub (via Java)")
+      return func()
     else
-      print("DEBUG ERROR (load): " .. tostring(err))
+      print("DEBUG ERROR: " .. tostring(err))
     end
   end
 
-  -- ถ้าโหลดจาก GitHub ไม่ได้ หรือ Error ให้ใช้ Local
   print("DEBUG: Loading from Local")
   return require "gamemode_control"
 end
 
 -- เรียกใช้
 local gm = loadGameModeModule()
+
 
 -- [[ ตรรกะปุ่มห้ามรบกวน (นำโค้ดไปวางแทนของเดิมในส่วนนี้) ]]
 btn_dnd.setOnClickListener(function(v)
