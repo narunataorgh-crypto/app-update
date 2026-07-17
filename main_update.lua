@@ -473,24 +473,42 @@ updateGameModeButtonUI(btn_gamemode)
 updateDndButtonUI(btn_dnd)
 updateBoostButtonUI(btn_boost)
 
--- 1. ลบ local gm ออก
--- 2. แก้ฟังก์ชันโหลดใน main.lua ให้เป็นแบบนี้:
-
 function loadGameModeModule()
   local url = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
-  
+  local localPath = activity.getLuaDir() .. "/gamemode_control.lua" -- ตำแหน่งไฟล์ในเครื่อง
+
   Http.get(url, function(code, content)
     if code == 200 then
       local func, err = load(content)
       if func then
-        _G.gm = func() -- เก็บค่าไว้ที่ _G.gm
-        print("DEBUG: Loaded to _G.gm successfully")
+        _G.gm = func()
+        print("DEBUG: Loaded from GitHub successfully")
       else
-        print("DEBUG ERROR: " .. tostring(err))
+        print("DEBUG ERROR: Load string failed, trying local file...")
+        loadLocalFallback(localPath)
       end
+    else
+      print("DEBUG: GitHub connection failed (Code: " .. tostring(code) .. "), trying local file...")
+      loadLocalFallback(localPath)
     end
   end)
 end
+
+-- ฟังก์ชันเสริมสำหรับโหลดไฟล์ในเครื่อง
+function loadLocalFallback(path)
+  if io.open(path, "r") then
+    local status, res = pcall(dofile, path)
+    if status then
+      _G.gm = res
+      print("DEBUG: Loaded from local storage successfully")
+    else
+      print("DEBUG ERROR: Failed to load local file")
+    end
+  else
+    print("DEBUG ERROR: No local gamemode file found!")
+  end
+end
+
 
 loadGameModeModule()
 
