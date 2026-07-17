@@ -43,10 +43,16 @@ function updateFPSValue()
   _G.fps_manager.currentDisplayFPS = target - variation
 end
 
--- ใน main.lua
-isGameModeActive = false -- เพิ่มตัวแปรนี้ไว้บนสุด
--- 1. ตัวแปรสถานะ (ใช้ i ตัวเล็ก ตามที่คุณใช้ในปุ่ม)
-isOptionOpen = false
+-- นำโค้ดชุดนี้ไปวางไว้บริเวณส่วนบนของไฟล์ (ต่อจากพวก require หรือก่อนเริ่มสร้าง Layout)
+isSidebarOpen = false
+lastNotifiedBattery = 100
+isGameModeActive = false
+isDNDActive = false
+isBoostActive = false
+isOptionOpen = false -- เพิ่มเติมจากที่มีอยู่
+player = MediaPlayer() -- ประกาศเป็นตัวแปรหลักตัวเดียวสำหรับใช้ทั้งไฟล์
+
+
 -- 2. สร้าง Root Layout
 local rootLayout = LinearLayout(activity)
 rootLayout.setLayoutParams(LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT))
@@ -70,13 +76,7 @@ local function dip2px(dpValue)
   return math.ceil(dpValue * density)
 end
 
-local isSidebarOpen = false
-local lastNotifiedBattery = 100
-local isGameModeActive = false -- เพิ่มตัวแปรเช็คสถานะโหมดเกมส์
-local isDNDActive = false
-local isBoostActive = false
 
-local player = MediaPlayer()
 
 
 -- [[ ฟังก์ชันเล่นไฟล์เสียงโหมดเกมส์ ]]
@@ -387,6 +387,18 @@ button_container.addView(btn_gamemode)
 button_container.addView(btnSystem)
 button_container.addView(btn_test_option)
 
+-- นำโค้ดนี้วางตรงนี้ครับ:
+btn_gamemode.setOnClickListener(function(v)
+  isGameModeActive = not isGameModeActive
+  updateGameModeButtonUI(btn_gamemode)
+
+  if gm and gm.toggle then
+    -- เพิ่ม activity และ rootLayout เข้าไปเพื่อให้ทำงานได้สมบูรณ์
+    gm.toggle(activity, isGameModeActive, rootLayout)
+    Toast.makeText(activity, isGameModeActive and "🚀 เปิดโหมดเกมส์แล้ว" or "🚀 ปิดโหมดเกมส์แล้ว", Toast.LENGTH_SHORT).show()
+  end
+end)
+
 -- สร้างเส้นคั่น (Separator)
 local separator = View(activity)
 separator.setLayoutParams(LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dip2px(2)))
@@ -459,13 +471,13 @@ updateBoostButtonUI(btn_boost)
 -- โค้ดดึงไฟล์จาก GitHub หรือ Local
 local function loadGameModeModule()
   local githubUrl = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
-  
+
   -- 1. พยายามโหลดจาก GitHub
   local success, result = pcall(function()
     local code = io.popen("curl -s " .. githubUrl):read("*a")
     if code and code ~= "" then
       return assert(load(code))()
-    else
+     else
       error("Empty from GitHub")
     end
   end)
@@ -474,7 +486,7 @@ local function loadGameModeModule()
   if not success then
     print("DEBUG: GitHub load failed, falling back to Local file.")
     return require "gamemode_control"
-  else
+   else
     print("DEBUG: GitHub loaded successfully.")
     return result
   end
