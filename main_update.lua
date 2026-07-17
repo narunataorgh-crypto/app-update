@@ -468,32 +468,32 @@ updateGameModeButtonUI(btn_gamemode)
 updateDndButtonUI(btn_dnd)
 updateBoostButtonUI(btn_boost)
 
--- โค้ดดึงไฟล์จาก GitHub หรือ Local
 local function loadGameModeModule()
   local githubUrl = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/gamemode_control.lua"
-
-  -- 1. พยายามโหลดจาก GitHub
-  local success, result = pcall(function()
-    local code = io.popen("curl -s " .. githubUrl):read("*a")
-    if code and code ~= "" then
-      return assert(load(code))()
-     else
-      error("Empty from GitHub")
+  
+  -- พยายามโหลดจาก GitHub
+  local code = Http.get(githubUrl)
+  if code and #code > 0 then
+    local status, result = pcall(load(code))
+    if status then
+      print("DEBUG: Loaded from GitHub")
+      return result
     end
-  end)
-
-  -- 2. ถ้า GitHub ไม่สำเร็จ ให้โหลดจากไฟล์ในเครื่อง (Local)
-  if not success then
-    print("DEBUG: GitHub load failed, falling back to Local file.")
-    return require "gamemode_control"
-   else
-    print("DEBUG: GitHub loaded successfully.")
-    return result
   end
+
+  -- ถ้าพลาด ให้โหลดจากเครื่อง
+  print("DEBUG: Loading from Local")
+  return require "gamemode_control"
 end
 
--- เรียกใช้ฟังก์ชันนี้แทน require เดิม
+-- รับค่ากลับมาให้มั่นใจ
 local gm = loadGameModeModule()
+
+-- เช็คก่อนใช้ทุกครั้ง
+if not gm then
+  print("ERROR: ไม่สามารถโหลดโมดูล gamemode ได้เลย!")
+end
+
 
 
 -- [[ ตรรกะปุ่มห้ามรบกวน (นำโค้ดไปวางแทนของเดิมในส่วนนี้) ]]
