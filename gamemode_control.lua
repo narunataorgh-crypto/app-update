@@ -204,7 +204,7 @@ local function showLauncherUI(activity, rootLayout)
   layout.addView(gameContainer)
 
   local gameData = {
-    {category="MOBA", games={{name="GARENA ROV", color="#442233", icon="rov.png", pkg="com.garena.game.kgth", "com.garena.game.cheto"}, {name="League of Legends: Wild Rift", color="#224433", icon="lol.png", pkg="com.riotgames.league.wildrift"}}},
+    {category="MOBA", games={{name="GARENA ROV", color="#442233", icon="rov.png", pkg="com.garena.game.kgth"}, {name="League of Legends: Wild Rift", color="#224433", icon="lol.png", pkg="com.riotgames.league.wildrift"}}},
     {category="FPS / Action", games={{name="PUBG MOBILE", color="#224433", icon="pubg.png", pkg="com.tencent.ig"}, {name="FREE FIRE", color="#224433", icon="freefire.png", pkg="com.dts.freefireth"}, {name="CALL OF DUTY", color="#334422", icon="cod.png", pkg="com.activision.callofduty.shooter"}, {name="Delta Force", color="#224433", icon="deltaforce.png", pkg="com.garena.game.df"}}},
     {category="RPG / Open World", games={{name="Genshin Impact", color="#442233", icon="genshin.png", pkg="com.miHoYo.GenshinImpact"}, {name="Wuthering Waves", color="#224433", icon="wuwa.png", pkg="com.kurogame.wutheringwaves.global"}, {name="RF ONLINE NEXT", color="#224433", icon="rf.png", pkg="com.netmarble.rfnext"}}},
     {category="Sports", games={{name="eFootball", color="#663322", icon="efootball.png", pkg="jp.konami.pesam"}}}
