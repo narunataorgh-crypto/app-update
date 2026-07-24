@@ -365,6 +365,9 @@ btn_test_option.setOnClickListener(function(v)
     local opt = require "option"
     opt.showOptionUI(activity)
     isOptionOpen = true
+      
+    -- ✨ เพิ่มตรงนี้: สั่งให้ยุบ Sidebar ทันทีเมื่อเปิดหน้าต่างตั้งค่าอื่นๆ
+    minimizeSidebar()
    else
     -- กรณีต้องการให้กดปิดเมนูได้ด้วย ให้ใส่โค้ดปิดที่นี่ เช่น opt.hideOptionUI(activity)
     isOptionOpen = false
@@ -402,6 +405,8 @@ btn_gamemode.setOnClickListener(function(v)
     _G.gm.toggle(activity, isGameModeActive, rootLayout)
     Toast.makeText(activity, isGameModeActive and "🚀 เปิดโหมดเกมส์แล้ว" or "🚀 ปิดโหมดเกมส์แล้ว", Toast.LENGTH_SHORT).show()
   end
+  -- ✨ เพิ่มตรงนี้: สั่งให้ยุบ Sidebar ทันทีเมื่อกดปุ่มโหมดเกมส์
+  minimizeSidebar()
 end)
 
 -- สร้างเส้นคั่น (Separator)
