@@ -247,4 +247,78 @@ if startApp() then
 end -- ปิดบล็อก if startApp()
 
 
+function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
+  -- ส่วนของฟังก์ชัน toggle เดิมของคุณที่นี่...
+  if isCurrentlyActive then
+    -- [ส่วนเปิดโหมดเกม]
+
+    -- 1. ซ่อนแถบสถานะ (Status Bar) และแถบนำทาง (Navigation Bar) เพื่อให้เต็มจอ
+    local decorView = activity.getWindow().getDecorView()
+    decorView.setSystemUiVisibility(
+    View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | -- ซ่อนแถบสีขาวข้างล่าง
+    View.SYSTEM_UI_FLAG_FULLSCREEN | -- ซ่อนแถบสถานะข้างบน
+    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY -- ให้ซ่อนกลับอัตโนมัติถ้ามีแถบโผล่มา
+    )
+
+    local videoLayout = FrameLayout(activity)
+    videoLayout.setLayoutParams(FrameLayout.LayoutParams(-1, -1))
+
+    import "android.widget.VideoView"
+    import "android.widget.FrameLayout"
+
+    local videoView = VideoView(activity)
+    local videoPath = activity.getLuaDir() .. "/res/bg.mp4"
+    videoView.setVideoPath(videoPath)
+
+    local params = FrameLayout.LayoutParams(-1, -1)
+    videoView.setLayoutParams(params)
+
+    videoView.setOnPreparedListener(MediaPlayer.OnPreparedListener({
+      onPrepared = function(mp)
+        local videoWidth = mp.getVideoWidth()
+        local videoHeight = mp.getVideoHeight()
+        local screenWidth = activity.getWindowManager().getDefaultDisplay().getWidth()
+        local screenHeight = activity.getWindowManager().getDefaultDisplay().getHeight()
+
+        -- เปลี่ยนมาใช้ math.max เพื่อให้วิดีโอขยายจน "เต็มพื้นที่" แม้จะต้องตัดขอบออกบ้าง
+        local scaleX = screenWidth / videoWidth
+        local scaleY = screenHeight / videoHeight
+        local scale = math.max(scaleX, scaleY)
+
+        videoView.setScaleX(scale)
+        videoView.setScaleY(scale)
+
+        -- ปรับให้อยู่กึ่งกลางหน้าจอเสมอ
+        videoView.setPivotX(videoWidth / 2)
+        videoView.setPivotY(videoHeight / 2)
+
+        mp.setLooping(false)
+        videoView.start()
+      end
+    }))
+
+    videoView.setOnCompletionListener(MediaPlayer.OnCompletionListener({
+      onCompletion = function(mp)
+        -- วิดีโอเล่นจบ ให้คืนค่าแถบระบบกลับมาและโชว์หน้า Launcher
+        decorView.setSystemUiVisibility(0)
+        showLauncherUI(activity, rootLayout)
+      end
+    }))
+
+    videoLayout.addView(videoView)
+    activity.setContentView(videoLayout)
+
+   else
+    -- [ส่วนกดปิดโหมดเกม]
+    isGameModeActive = false
+    -- คืนค่าแถบระบบกลับมาปกติ
+    activity.getWindow().getDecorView().setSystemUiVisibility(0)
+    activity.setContentView(rootLayout)
+    Toast.makeText(activity, "ปิดโหมดเกมแล้ว", Toast.LENGTH_SHORT).show()
+  end
+end
+
 return gamemode
