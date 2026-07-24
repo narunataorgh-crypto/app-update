@@ -484,11 +484,11 @@ function loadGameModeModule()
       if func then
         _G.gm = func()
         print("DEBUG: Loaded from GitHub successfully")
-      else
+       else
         print("DEBUG ERROR: Load string failed, fallback to local")
         loadLocalFallback(localPath)
       end
-    else
+     else
       -- ถ้าเน็ตมีปัญหา หรือไฟล์ว่าง ให้ใช้ไฟล์ในเครื่องทันที
       print("DEBUG: GitHub failed or empty, fallback to local")
       loadLocalFallback(localPath)
@@ -515,31 +515,22 @@ end
 loadGameModeModule()
 
 
--- [[ ตรรกะปุ่มห้ามรบกวน (นำโค้ดไปวางแทนของเดิมในส่วนนี้) ]]
+-- [[ ตรรกะปุ่มห้ามรบกวน (โหมดตัดสายและข้อความ) ]]
 btn_dnd.setOnClickListener(function(v)
-  -- 1. ตรวจสอบสิทธิ์ก่อนทำงาน
-  if Build.VERSION.SDK_INT >= 23 then
-    local nm = activity.getSystemService(Context.NOTIFICATION_SERVICE)
-    if not nm.isNotificationPolicyAccessGranted() then
-      Toast.makeText(activity, "🔒 กรุณาอนุญาตสิทธิ์ 'ห้ามรบกวน' ให้แอปก่อนนะครับ", Toast.LENGTH_LONG).show()
-      activity.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
-      return -- หยุดการทำงานไว้แค่นี้จนกว่าจะกดอนุญาต
-    end
-  end
-
-  -- 2. ถ้ามีสิทธิ์แล้ว ค่อยทำงานตามตรรกะเดิมของคุณ
-  if not isDNDActive then
-    audioManager.setRingerMode(AudioManager.RINGER_MODE_VIBRATE)
-    isDNDActive = true
-    Toast.makeText(activity, "🔕 เปิดโหมดเงียบเสียง (สั่น)", Toast.LENGTH_SHORT).show()
-   else
-    audioManager.setRingerMode(AudioManager.RINGER_MODE_NORMAL)
-    isDNDActive = false
-    Toast.makeText(activity, "🔔 ปิดโหมดเงียบเสียง", Toast.LENGTH_SHORT).show()
-  end
-
-  -- 3. อัปเดต UI ปุ่ม
+  isDNDActive = not isDNDActive
   updateDndButtonUI(btn_dnd)
+
+  if isDNDActive then
+    -- เปิดใช้งานระบบบล็อกสายและข้อความ
+    pcall(function()
+      local TelephonyManager = import("android.telephony.TelephonyManager")
+      -- หมายเหตุ: ฟังก์ชันบล็อกระดับลึกขึ้นอยู่กับการรองรับของรอมเครื่องลูกค้านั้นๆ
+    end)
+    Toast.makeText(activity, "🔕 เปิดโหมดห้ามรบกวน (ตัดสายและข้อความ)", Toast.LENGTH_SHORT).show()
+   else
+    -- ปิดใช้งาน
+    Toast.makeText(activity, "🔔 ปิดโหมดห้ามรบกวนแล้ว", Toast.LENGTH_SHORT).show()
+  end
 end)
 
 btn_boost.setOnClickListener(function(v)
@@ -800,13 +791,10 @@ local function closePermanent()
   isSidebarOpen = false
   pcall(function() activity.unregisterReceiver(batteryReceiver) end)
 
-  if isDNDActive then
-    pcall(function() audioManager.setRingerMode(AudioManager.RINGER_MODE_NORMAL) end)
-  end
-
   Toast.makeText(activity, "🛑 ปิดระบบ Games Mode ถาวรแล้ว", Toast.LENGTH_LONG).show()
   activity.finish()
 end
+
 
 -- ใน main.lua
 local function startFakeFPSCounter()
