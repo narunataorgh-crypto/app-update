@@ -1,4 +1,5 @@
 require "import"
+import "android.view.WindowManager"
 import "android.widget.*"
 import "android.view.*"
 import "android.graphics.PixelFormat"
@@ -77,12 +78,13 @@ local function dip2px(dpValue)
 end
 
 -- [[ 1. สร้างปุ่มติ่งขอบสำหรับกดเปิด Sidebar ]]
-local triggerParams = WindowManager.LayoutParams()
-triggerParams.width = WindowManager.LayoutParams.WRAP_CONTENT
-triggerParams.height = WindowManager.LayoutParams.WRAP_CONTENT
-triggerParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-triggerParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-triggerParams.format = PixelFormat.TRANSLUCENT
+local triggerParams = WindowManager.LayoutParams(
+  WindowManager.LayoutParams.WRAP_CONTENT,
+  WindowManager.LayoutParams.WRAP_CONTENT,
+  WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+  WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+  PixelFormat.TRANSLUCENT
+)
 triggerParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
 triggerParams.x = 0
 triggerParams.y = 0
@@ -248,12 +250,13 @@ local function updateBoostButtonUI(btn)
   btn.setBackgroundDrawable(btnBg)
 end
 
-local sidebarParams = WindowManager.LayoutParams()
-sidebarParams.width = dip2px(185) -- หรือขนาดที่คุณต้องการ
-sidebarParams.height = WindowManager.LayoutParams.MATCH_PARENT
-sidebarParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-sidebarParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-sidebarParams.format = PixelFormat.TRANSLUCENT
+local sidebarParams = WindowManager.LayoutParams(
+  dip2px(185),
+  WindowManager.LayoutParams.MATCH_PARENT,
+  WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+  WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+  PixelFormat.TRANSLUCENT
+)
 sidebarParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
 sidebarParams.windowAnimations = android.R.style.Animation_Toast
 
