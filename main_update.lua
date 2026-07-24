@@ -105,6 +105,36 @@ if Build.VERSION.SDK_INT >= 23 then
   end
 end
 
+-- [[ 6. ตรรกะจัดการระบบ เปิด - ยุบ - ปิดถาวร ]]
+local function openSidebar()
+  if not isSidebarOpen then
+    windowManager.addView(sidebarView, sidebarParams)
+    windowManager.removeView(triggerButton)
+    isSidebarOpen = true
+  end
+end
+
+local function minimizeSidebar()
+  if isSidebarOpen then
+    windowManager.removeView(sidebarView)
+    windowManager.addView(triggerButton, triggerParams)
+    isSidebarOpen = false
+  end
+end
+
+local function closePermanent()
+  if isSidebarOpen then
+    windowManager.removeView(sidebarView)
+   else
+    pcall(function() windowManager.removeView(triggerButton) end)
+  end
+  isSidebarOpen = false
+  pcall(function() activity.unregisterReceiver(batteryReceiver) end)
+
+  Toast.makeText(activity, "🛑 ปิดระบบ Games Mode ถาวรแล้ว", Toast.LENGTH_LONG).show()
+  activity.finish()
+end
+
 
 -- [[ 1. สร้างปุ่มติ่งขอบสำหรับกดเปิด Sidebar ]]
 local triggerParams = WindowManager.LayoutParams(
@@ -365,7 +395,7 @@ btn_test_option.setOnClickListener(function(v)
     local opt = require "option"
     opt.showOptionUI(activity)
     isOptionOpen = true
-      
+    
     -- ✨ เพิ่มตรงนี้: สั่งให้ยุบ Sidebar ทันทีเมื่อเปิดหน้าต่างตั้งค่าอื่นๆ
     minimizeSidebar()
    else
@@ -405,6 +435,7 @@ btn_gamemode.setOnClickListener(function(v)
     _G.gm.toggle(activity, isGameModeActive, rootLayout)
     Toast.makeText(activity, isGameModeActive and "🚀 เปิดโหมดเกมส์แล้ว" or "🚀 ปิดโหมดเกมส์แล้ว", Toast.LENGTH_SHORT).show()
   end
+
   -- ✨ เพิ่มตรงนี้: สั่งให้ยุบ Sidebar ทันทีเมื่อกดปุ่มโหมดเกมส์
   minimizeSidebar()
 end)
@@ -769,36 +800,6 @@ local batteryReceiver = LuaBroadcastReceiver(function(context, intent)
 end)
 
 activity.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-
--- [[ 6. ตรรกะจัดการระบบ เปิด - ยุบ - ปิดถาวร ]]
-local function openSidebar()
-  if not isSidebarOpen then
-    windowManager.addView(sidebarView, sidebarParams)
-    windowManager.removeView(triggerButton)
-    isSidebarOpen = true
-  end
-end
-
-local function minimizeSidebar()
-  if isSidebarOpen then
-    windowManager.removeView(sidebarView)
-    windowManager.addView(triggerButton, triggerParams)
-    isSidebarOpen = false
-  end
-end
-
-local function closePermanent()
-  if isSidebarOpen then
-    windowManager.removeView(sidebarView)
-   else
-    pcall(function() windowManager.removeView(triggerButton) end)
-  end
-  isSidebarOpen = false
-  pcall(function() activity.unregisterReceiver(batteryReceiver) end)
-
-  Toast.makeText(activity, "🛑 ปิดระบบ Games Mode ถาวรแล้ว", Toast.LENGTH_LONG).show()
-  activity.finish()
-end
 
 
 -- ใน main.lua
