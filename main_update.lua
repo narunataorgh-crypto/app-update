@@ -77,34 +77,6 @@ local function dip2px(dpValue)
 end
 
 
-
-
--- [[ ฟังก์ชันเล่นไฟล์เสียงโหมดเกมส์ ]]
-local function playGameModeSound()
-  local success, err = pcall(function()
-    local player = MediaPlayer()
-    player.reset()
-    player.setDataSource(activity.getLuaDir().."/gamesmode.mp3")
-    player.prepare()
-    player.start()
-  end)
-  if not success then
-    Toast.makeText(activity, "🔊 เล่นเสียงล้มเหลว (เช็คชื่อไฟล์เสียงอีกครั้ง)", Toast.LENGTH_SHORT).show()
-  end
-end
-
--- [[ ตรรกะตรวจสอบและขอสิทธิ์หน้าต่างลอย ]]
-if Build.VERSION.SDK_INT >= 23 then
-  if not Settings.canDrawOverlays(activity) then
-    Toast.makeText(activity, "🔒 กรุณาเปิดสิทธิ์ 'แสดงทับแอปอื่นๆ' ตามขั้นตอนแนะนำก่อนนะครับ", Toast.LENGTH_LONG).show()
-    local intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-    intent.setData(Uri.parse("package:" .. activity.getPackageName()))
-    activity.startActivity(intent)
-    activity.finish()
-    return
-  end
-end
-
 -- [[ 6. ตรรกะจัดการระบบ เปิด - ยุบ - ปิดถาวร ]]
 local function openSidebar()
   if not isSidebarOpen then
@@ -133,6 +105,33 @@ local function closePermanent()
 
   Toast.makeText(activity, "🛑 ปิดระบบ Games Mode ถาวรแล้ว", Toast.LENGTH_LONG).show()
   activity.finish()
+end
+
+
+-- [[ ฟังก์ชันเล่นไฟล์เสียงโหมดเกมส์ ]]
+local function playGameModeSound()
+  local success, err = pcall(function()
+    local player = MediaPlayer()
+    player.reset()
+    player.setDataSource(activity.getLuaDir().."/gamesmode.mp3")
+    player.prepare()
+    player.start()
+  end)
+  if not success then
+    Toast.makeText(activity, "🔊 เล่นเสียงล้มเหลว (เช็คชื่อไฟล์เสียงอีกครั้ง)", Toast.LENGTH_SHORT).show()
+  end
+end
+
+-- [[ ตรรกะตรวจสอบและขอสิทธิ์หน้าต่างลอย ]]
+if Build.VERSION.SDK_INT >= 23 then
+  if not Settings.canDrawOverlays(activity) then
+    Toast.makeText(activity, "🔒 กรุณาเปิดสิทธิ์ 'แสดงทับแอปอื่นๆ' ตามขั้นตอนแนะนำก่อนนะครับ", Toast.LENGTH_LONG).show()
+    local intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
+    intent.setData(Uri.parse("package:" .. activity.getPackageName()))
+    activity.startActivity(intent)
+    activity.finish()
+    return
+  end
 end
 
 
