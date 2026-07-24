@@ -250,6 +250,7 @@ local function updateBoostButtonUI(btn)
   btn.setBackgroundDrawable(btnBg)
 end
 
+-- [[ แก้ไขจุดประกาศ sidebarParams ตรงนี้ครับ ]]
 local sidebarParams = WindowManager.LayoutParams(
   dip2px(185),
   WindowManager.LayoutParams.MATCH_PARENT,
