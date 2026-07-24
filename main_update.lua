@@ -77,6 +77,29 @@ local function dip2px(dpValue)
 end
 
 
+-- [[ 1. สร้างปุ่มติ่งขอบสำหรับกดเปิด Sidebar ]]
+local triggerParams = WindowManager.LayoutParams(
+WindowManager.LayoutParams.WRAP_CONTENT,
+WindowManager.LayoutParams.WRAP_CONTENT,
+WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+PixelFormat.TRANSLUCENT
+)
+triggerParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
+triggerParams.x = 0
+triggerParams.y = 0
+
+local triggerButton = Button(activity)
+triggerButton.setText("▶")
+triggerButton.setTextColor(0xFFFFFFFF)
+triggerButton.setTextSize(12)
+local triggerBg = GradientDrawable()
+triggerBg.setColor(0x80E53E3E)
+triggerBg.setCornerRadii({0, 0, 15, 15, 15, 15, 0, 0})
+triggerButton.setBackgroundDrawable(triggerBg)
+triggerButton.setPadding(10, 30, 20, 30)
+
+
 -- [[ 6. ตรรกะจัดการระบบ เปิด - ยุบ - ปิดถาวร ]]
 local function openSidebar()
   if not isSidebarOpen then
@@ -133,29 +156,6 @@ if Build.VERSION.SDK_INT >= 23 then
     return
   end
 end
-
-
--- [[ 1. สร้างปุ่มติ่งขอบสำหรับกดเปิด Sidebar ]]
-local triggerParams = WindowManager.LayoutParams(
-WindowManager.LayoutParams.WRAP_CONTENT,
-WindowManager.LayoutParams.WRAP_CONTENT,
-WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-PixelFormat.TRANSLUCENT
-)
-triggerParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
-triggerParams.x = 0
-triggerParams.y = 0
-
-local triggerButton = Button(activity)
-triggerButton.setText("▶")
-triggerButton.setTextColor(0xFFFFFFFF)
-triggerButton.setTextSize(12)
-local triggerBg = GradientDrawable()
-triggerBg.setColor(0x80E53E3E)
-triggerBg.setCornerRadii({0, 0, 15, 15, 15, 15, 0, 0})
-triggerButton.setBackgroundDrawable(triggerBg)
-triggerButton.setPadding(10, 30, 20, 30)
 
 
 -- 1. เรียกใช้งานหลังจาก require "AllGames" แล้ว
