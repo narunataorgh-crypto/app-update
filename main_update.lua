@@ -111,7 +111,19 @@ end
 local function minimizeSidebar()
   if isSidebarOpen then
     windowManager.removeView(sidebarView)
-    windowManager.addView(triggerButton, triggerParams)
+    
+    -- สร้าง LayoutParams สดใหม่แบบปลอดภัย 100% ป้องกัน AndroLua แปลงชนิดตัวแปรเพี้ยน
+    local newTriggerParams = WindowManager.LayoutParams()
+    newTriggerParams.width = WindowManager.LayoutParams.WRAP_CONTENT
+    newTriggerParams.height = WindowManager.LayoutParams.WRAP_CONTENT
+    newTriggerParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+    newTriggerParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+    newTriggerParams.format = PixelFormat.TRANSLUCENT
+    newTriggerParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
+    newTriggerParams.x = 0
+    newTriggerParams.y = 0
+
+    windowManager.addView(triggerButton, newTriggerParams)
     isSidebarOpen = false
   end
 end
