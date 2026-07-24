@@ -77,7 +77,7 @@ local function dip2px(dpValue)
   return math.ceil(dpValue * density)
 end
 
--- [[ 1. สร้างปุ่มติ่งขอบสำหรับกดเปิด Sidebar ]]
+-- [[ แก้ไขจุดประกาศ triggerParams ตรงนี้ครับ ]]
 local triggerParams = WindowManager.LayoutParams(
   WindowManager.LayoutParams.WRAP_CONTENT,
   WindowManager.LayoutParams.WRAP_CONTENT,
