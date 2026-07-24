@@ -77,14 +77,13 @@ local function dip2px(dpValue)
   return math.ceil(dpValue * density)
 end
 
--- [[ แก้ไขจุดประกาศ triggerParams ตรงนี้ครับ ]]
-local triggerParams = WindowManager.LayoutParams(
-  WindowManager.LayoutParams.WRAP_CONTENT,
-  WindowManager.LayoutParams.WRAP_CONTENT,
-  WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-  WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-  PixelFormat.TRANSLUCENT
-)
+-- [[ 2. สร้าง Trigger Button Layout Params แบบปลอดภัย ]]
+local triggerParams = WindowManager.LayoutParams()
+triggerParams.width = WindowManager.LayoutParams.WRAP_CONTENT
+triggerParams.height = WindowManager.LayoutParams.WRAP_CONTENT
+triggerParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+triggerParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+triggerParams.format = PixelFormat.TRANSLUCENT
 triggerParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
 triggerParams.x = 0
 triggerParams.y = 0
@@ -250,14 +249,12 @@ local function updateBoostButtonUI(btn)
   btn.setBackgroundDrawable(btnBg)
 end
 
--- [[ แก้ไขจุดประกาศ sidebarParams ตรงนี้ครับ ]]
-local sidebarParams = WindowManager.LayoutParams(
-  dip2px(185),
-  WindowManager.LayoutParams.MATCH_PARENT,
-  WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-  WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-  PixelFormat.TRANSLUCENT
-)
+local sidebarParams = WindowManager.LayoutParams()
+sidebarParams.width = dip2px(185)
+sidebarParams.height = WindowManager.LayoutParams.MATCH_PARENT
+sidebarParams.type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+sidebarParams.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+sidebarParams.format = PixelFormat.TRANSLUCENT
 sidebarParams.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL
 sidebarParams.windowAnimations = android.R.style.Animation_Toast
 
