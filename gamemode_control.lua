@@ -212,7 +212,7 @@ local function showLauncherUI(activity, rootLayout)
 
   local gameCache = {}
 
-  -- สร้างระบบเสียงพูด TextToSpeech (แก้ไขวิธีเรียกใช้งาน Locale ให้ถูกต้อง)
+  -- สร้างระบบเสียงพูด TextToSpeech
   import "android.speech.tts.TextToSpeech"
   import "java.util.Locale"
   local tts = nil
@@ -221,7 +221,7 @@ local function showLauncherUI(activity, rootLayout)
   tts = TextToSpeech(activity, TextToSpeech.OnInitListener({
     onInit = function(status)
       if status == TextToSpeech.SUCCESS then
-        local result = tts.setLanguage(Locale.THAI)
+        local result = tts.setLanguage(Locale("th", "TH"))
         if result == TextToSpeech.LANG_MISSING_DATA or result == TextToSpeech.LANG_NOT_SUPPORTED then
           tts.setLanguage(Locale.US)
         end
@@ -402,12 +402,11 @@ function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
 
     videoView.setOnPreparedListener(MediaPlayer.OnPreparedListener({
       onPrepared = function(mp)
-        local videoWidth = mp.getVideoWidth()
-        local videoHeight = mp.getVideoHeight()
-        local screenWidth = activity.getWindowManager().getDefaultDisplay().getWidth()
-        local screenHeight = activity.getWindowManager().getDefaultDisplay().getHeight()
+        local videoWidth = tonumber(mp.getVideoWidth())
+        local videoHeight = tonumber(mp.getVideoHeight())
+        local screenWidth = tonumber(activity.getWindowManager().getDefaultDisplay().getWidth())
+        local screenHeight = tonumber(activity.getWindowManager().getDefaultDisplay().getHeight())
 
-        -- เปลี่ยนมาใช้ math.max เพื่อให้วิดีโอขยายจน "เต็มพื้นที่" แม้จะต้องตัดขอบออกบ้าง
         local scaleX = screenWidth / videoWidth
         local scaleY = screenHeight / videoHeight
         local scale = math.max(scaleX, scaleY)
@@ -415,7 +414,6 @@ function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
         videoView.setScaleX(scale)
         videoView.setScaleY(scale)
 
-        -- ปรับให้อยู่กึ่งกลางหน้าจอเสมอ
         videoView.setPivotX(videoWidth / 2)
         videoView.setPivotY(videoHeight / 2)
 
