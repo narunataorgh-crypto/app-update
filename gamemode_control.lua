@@ -40,30 +40,26 @@ local function loadManualGames(activity)
     itemLayout.setGravity(Gravity.CENTER)
     itemLayout.setPadding(2, 2, 2, 2)
 
-    -- คำนวณความกว้างใหม่: เอาความกว้างหน้าจอ หาร 4 แล้วลบ Padding ออกเล็กน้อย
-    local screenWidth = activity.getWindowManager().getDefaultDisplay().getWidth()
-    local itemWidth = (screenWidth - 100) / 4 -- ลบ 100 คือเผื่อระยะขอบ padding ของหน้าหลัก
+    -- แปลงค่าความกว้างหน้าจอเป็นตัวเลขด้วย tonumber() ป้องกัน Error String
+    local screenWidth = tonumber(activity.getWindowManager().getDefaultDisplay().getWidth()) or 1080
+    local itemWidth = (screenWidth - 100) / 4
 
     local params = GridLayout.LayoutParams()
     params.width = itemWidth
-    params.height = 160 -- ปรับขึ้นมานิดหน่อยให้ไม่เบียด
+    params.height = 160
     itemLayout.setLayoutParams(params)
 
-    -- เปลี่ยนจาก Button เป็น ImageView เพื่อโชว์แค่ไอคอน
     local iconView = ImageView(activity)
     local icon = pm.getApplicationIcon(info)
     iconView.setImageDrawable(icon)
-    local iconParams = LinearLayout.LayoutParams(90, 90) -- ปรับเป็น 90x90
+    local iconParams = LinearLayout.LayoutParams(90, 90)
     iconView.setLayoutParams(iconParams)
 
-
-    -- ทำการคลิกที่ ImageView ได้โดยตรง
     iconView.setOnClickListener(function()
       local intent = pm.getLaunchIntentForPackage(pkg)
       if intent then activity.startActivity(intent) end
     end)
 
-    -- ทำการ LongClick ที่ ImageView
     iconView.setOnLongClickListener(View.OnLongClickListener({
       onLongClick = function(v)
         import "android.app.AlertDialog"
@@ -84,23 +80,19 @@ local function loadManualGames(activity)
       end
     }))
 
-    -- สร้าง TextView สำหรับชื่อแอป
     local label = TextView(activity)
     label.setText(tostring(pm.getApplicationLabel(info)))
     label.setTextColor(0xFFFFFFFF)
     label.setTextSize(10)
     label.setGravity(Gravity.CENTER)
-    -- ปรับระยะห่างให้ชิดไอคอน (ใช้ค่าติดลบให้น้อยลงได้ตามต้องการ)
     label.setPadding(0, 0, 0, 0)
 
-    -- เพิ่ม ImageView และ TextView เข้าไปใน itemLayout
     itemLayout.addView(iconView)
     itemLayout.addView(label)
 
     manualContainer.addView(itemLayout)
   end
 
-  -- วนลูปสร้างไอคอน
   for i, pkg in ipairs(lines) do
     local success, info = pcall(function() return pm.getApplicationInfo(pkg, 0) end)
     if success and info then
@@ -108,7 +100,6 @@ local function loadManualGames(activity)
     end
   end
 
-  -- สร้างปุ่ม "+" (อยู่ข้างนอก loop และข้างนอก createItem)
   local addBtn = Button(activity)
   local params = GridLayout.LayoutParams()
   params.width = 100
@@ -152,32 +143,12 @@ local function loadManualGames(activity)
   manualContainer.requestLayout()
 end
 
-local function getNoticeFromGitHub()
-  -- ใช้ Thread เพื่อดึงข้อมูล จะช่วยให้แอปไม่ค้างและโหลดข้อมูลได้ดีขึ้น
-  local content = "กำลังโหลดประกาศ..."
-  Thread(function()
-    local ok, res = pcall(function() return http.get("https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/notice_data.txt") end)
-    if ok and res then
-      -- อัปเดตข้อความบน UI Thread
-      activity.runOnUiThread(function()
-        contentText.setText(res)
-      end)
-     else
-      activity.runOnUiThread(function()
-        contentText.setText("ไม่สามารถโหลดประกาศได้ (ตรวจสอบเน็ต)")
-      end)
-    end
-  end).start()
-  return content
-end
-
 local function showLauncherUI(activity, rootLayout)
   local scroll = ScrollView(activity)
   local bgPath = activity.getLuaDir() .. "/res/bg.png"
 
-  -- ใช้ BitmapFactory เพื่อโหลดภาพแบบย่อขนาดป้องกัน RAM เต็ม
   local opts = BitmapFactory.Options()
-  opts.inSampleSize = 2 -- ลองปรับเป็น 2 ถ้ายัง Error ให้ปรับเป็น 4
+  opts.inSampleSize = 2
   local bmp = BitmapFactory.decodeFile(bgPath, opts)
 
   if bmp then
@@ -191,14 +162,12 @@ local function showLauncherUI(activity, rootLayout)
   layout.setPadding(30, 30, 30, 30)
   scroll.addView(layout)
 
-  -- 1. หัวข้อ (บนสุด)
   local title = TextView(activity)
   title.setText("🎮 เลือกเกมของคุณ")
   title.setTextSize(22)
   title.setTextColor(0xFFFFFFFF)
   layout.addView(title)
 
-  -- 2. รายการเกม
   local gameContainer = LinearLayout(activity)
   gameContainer.setOrientation(LinearLayout.VERTICAL)
   layout.addView(gameContainer)
@@ -212,7 +181,6 @@ local function showLauncherUI(activity, rootLayout)
 
   local gameCache = {}
 
-  -- สร้างระบบเสียงพูด TextToSpeech
   import "android.speech.tts.TextToSpeech"
   import "java.util.Locale"
   local tts = nil
@@ -233,7 +201,7 @@ local function showLauncherUI(activity, rootLayout)
   local function renderGames()
     for _, group in ipairs(gameData) do
       local categoryBtn = Button(activity)
-      categoryBtn.setText("📂 " + group.category) -- แก้ไขเครื่องหมายเชื่อมข้อความให้ปลอดภัยใน Lua
+      categoryBtn.setText("📂 " .. group.category)
       categoryBtn.setBackgroundColor(0xFF222222)
       categoryBtn.setTextColor(0xFF00FF00)
       local subContainer = LinearLayout(activity)
@@ -259,14 +227,12 @@ local function showLauncherUI(activity, rootLayout)
         btn.setText(data.installed and game.name or (game.name .. "\n(กรุณาติดตั้งเกม)"))
         btn.setBackgroundColor(data.installed and Color.parseColor(game.color) or 0xFF555555)
         
-        -- แก้ไขปุ่มกดเข้าเกมให้หน่วงเวลาเล็กน้อยเพื่อให้เสียงพูดทันเปล่งออกมา
         btn.setOnClickListener(function()
           if data.installed then
             if isTTSReady and tts then
               tts.speak("กำลังเปิด " .. game.name, TextToSpeech.QUEUE_FLUSH, nil, nil)
             end
             
-            -- หน่วงเวลา 350 มิลลิวินาที ให้เสียงพูดเริ่มออกมาก่อน ค่อยสลับหน้าจอไปเปิดเกม
             task(350, function()
               activity.startActivity(activity.getPackageManager().getLaunchIntentForPackage(game.pkg))
             end)
@@ -283,7 +249,6 @@ local function showLauncherUI(activity, rootLayout)
   end
   renderGames()
 
-  -- 3. เส้นคั่น (Divider)
   local divider = View(activity)
   divider.setLayoutParams(LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 4))
   divider.setBackgroundColor(0xFF888888)
@@ -292,7 +257,6 @@ local function showLauncherUI(activity, rootLayout)
   divider.setLayoutParams(margin)
   layout.addView(divider)
 
-  -- [ส่วนที่ 3.5] ระบบเพิ่มเกมโปรดเอง
   local titleManual = TextView(activity)
   titleManual.setText("🎮 เกมและแอปโปรด (เพิ่มเอง)")
   titleManual.setTextColor(0xFF00FF00)
@@ -305,40 +269,32 @@ local function showLauncherUI(activity, rootLayout)
   frameDrawable.setColor(0x40000000)
 
   manualContainer = GridLayout(activity)
-  -- ใช้ความกว้าง MATCH_PARENT (-1) เพื่อให้มันยืดเต็มหน้าจอ
   local params = LinearLayout.LayoutParams(-1, -2)
   manualContainer.setLayoutParams(params)
-
   manualContainer.setColumnCount(4)
-
-  -- ปรับ Padding ให้เล็กลงเพื่อให้มีพื้นที่วางไอคอนมากขึ้น
   manualContainer.setPadding(10, 10, 10, 10)
-
   manualContainer.setBackgroundDrawable(frameDrawable)
   layout.addView(manualContainer)
 
-  -- โหลดครั้งแรก
   loadManualGames(activity)
 
-  -- 3. เส้นคั่น (Divider)
-  local divider = View(activity)
-  divider.setLayoutParams(LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 4))
-  divider.setBackgroundColor(0xFF888888)
-  local margin = LinearLayout.LayoutParams(divider.getLayoutParams())
-  margin.setMargins(0, 20, 0, 20)
-  divider.setLayoutParams(margin)
-  layout.addView(divider)
+  local divider2 = View(activity)
+  divider2.setLayoutParams(LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 4))
+  divider2.setBackgroundColor(0xFF888888)
+  local margin2 = LinearLayout.LayoutParams(divider2.getLayoutParams())
+  margin2.setMargins(0, 20, 0, 20)
+  divider2.setLayoutParams(margin2)
+  layout.addView(divider2)
 
-  -- 4. กรอบคำเตือน (ล่างสุด) - ปรับเป็นกรอบมีเส้นขอบและพื้นหลังโปร่งแสง
   local drawable = GradientDrawable()
   drawable.setShape(GradientDrawable.RECTANGLE)
-  drawable.setCornerRadius(20) -- ความมนของมุมกรอบ
-  drawable.setStroke(4, 0xFF00FF00) -- เส้นขอบสีเขียว หนา 4px
-  drawable.setColor(0x40000000) -- พื้นหลังสีดำโปร่งแสง (ค่า 40 คือความโปร่ง)
+  drawable.setCornerRadius(20)
+  drawable.setStroke(4, 0xFF00FF00)
+  drawable.setColor(0x40000000)
 
   local warningLayout = LinearLayout(activity)
   warningLayout.setOrientation(LinearLayout.VERTICAL)
-  warningLayout.setBackgroundDrawable(drawable) -- ใช้งาน Drawable ที่สร้างขึ้น
+  warningLayout.setBackgroundDrawable(drawable)
   warningLayout.setPadding(30, 30, 30, 30)
 
   local labelText = TextView(activity)
@@ -353,8 +309,6 @@ local function showLauncherUI(activity, rootLayout)
 
   Thread(function()
     local url = "https://raw.githubusercontent.com/narunataorgh-crypto/app-update/refs/heads/main/notice_data.txt"
-
-    -- วิธีนี้คือการใช้ callback function แทนการใช้ .execute()
     Http.get(url, function(code, content)
       activity.runOnUiThread(function()
         if code == 200 then
@@ -367,24 +321,19 @@ local function showLauncherUI(activity, rootLayout)
   end).start()
 
   layout.addView(warningLayout)
-
   activity.setContentView(scroll)
 end
 
 function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
-  -- ส่วนของฟังก์ชัน toggle เดิมของคุณที่นี่...
   if isCurrentlyActive then
-    -- [ส่วนเปิดโหมดเกม]
-
-    -- 1. ซ่อนแถบสถานะ (Status Bar) และแถบนำทาง (Navigation Bar) เพื่อให้เต็มจอ
     local decorView = activity.getWindow().getDecorView()
     decorView.setSystemUiVisibility(
-    View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
-    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
-    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
-    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | -- ซ่อนแถบสีขาวข้างล่าง
-    View.SYSTEM_UI_FLAG_FULLSCREEN | -- ซ่อนแถบสถานะข้างบน
-    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY -- ให้ซ่อนกลับอัตโนมัติถ้ามีแถบโผล่มา
+      View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+      View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+      View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+      View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+      View.SYSTEM_UI_FLAG_FULLSCREEN |
+      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
     )
 
     local videoLayout = FrameLayout(activity)
@@ -402,10 +351,10 @@ function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
 
     videoView.setOnPreparedListener(MediaPlayer.OnPreparedListener({
       onPrepared = function(mp)
-        local videoWidth = tonumber(mp.getVideoWidth())
-        local videoHeight = tonumber(mp.getVideoHeight())
-        local screenWidth = tonumber(activity.getWindowManager().getDefaultDisplay().getWidth())
-        local screenHeight = tonumber(activity.getWindowManager().getDefaultDisplay().getHeight())
+        local videoWidth = tonumber(mp.getVideoWidth()) or 1
+        local videoHeight = tonumber(mp.getVideoHeight()) or 1
+        local screenWidth = tonumber(activity.getWindowManager().getDefaultDisplay().getWidth()) or 1080
+        local screenHeight = tonumber(activity.getWindowManager().getDefaultDisplay().getHeight()) or 1920
 
         local scaleX = screenWidth / videoWidth
         local scaleY = screenHeight / videoHeight
@@ -424,7 +373,6 @@ function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
 
     videoView.setOnCompletionListener(MediaPlayer.OnCompletionListener({
       onCompletion = function(mp)
-        -- วิดีโอเล่นจบ ให้คืนค่าแถบระบบกลับมาและโชว์หน้า Launcher
         decorView.setSystemUiVisibility(0)
         mp.release()
         showLauncherUI(activity, rootLayout)
@@ -435,9 +383,7 @@ function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
     activity.setContentView(videoLayout)
 
    else
-    -- [ส่วนกดปิดโหมดเกม]
     isGameModeActive = false
-    -- คืนค่าแถบระบบกลับมาปกติ
     activity.getWindow().getDecorView().setSystemUiVisibility(0)
     activity.setContentView(rootLayout)
     Toast.makeText(activity, "ปิดโหมดเกมแล้ว", Toast.LENGTH_SHORT).show()
@@ -445,4 +391,3 @@ function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
 end
 
 return gamemode
-
