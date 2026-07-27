@@ -212,13 +212,20 @@ local function showLauncherUI(activity, rootLayout)
 
   local gameCache = {}
 
-  -- สร้างระบบเสียงพูด TextToSpeech ตรงนี้
+  -- สร้างระบบเสียงพูด TextToSpeech (ปรับปรุงใหม่ให้เช็คความพร้อม)
   import "android.speech.tts.TextToSpeech"
   local tts = nil
+  local isTTSReady = false
+
   tts = TextToSpeech(activity, TextToSpeech.OnInitListener({
     onInit = function(status)
       if status == TextToSpeech.SUCCESS then
-        tts.setLanguage(java.util.Locale("th", "TH"))
+        -- กำหนดภาษา (หากภาษาไทยในเครื่องไม่รองรับ ระบบจะ fallback ไปภาษาอังกฤษอัตโนมัติ)
+        local result = tts.setLanguage(java.util.Locale("th", "TH"))
+        if result == TextToSpeech.LANG_MISSING_DATA or result == TextToSpeech.LANG_NOT_SUPPORTED then
+          tts.setLanguage(java.util.Locale.US)
+        end
+        isTTSReady = true
       end
     end
   }))
@@ -226,7 +233,7 @@ local function showLauncherUI(activity, rootLayout)
   local function renderGames()
     for _, group in ipairs(gameData) do
       local categoryBtn = Button(activity)
-      categoryBtn.setText("📂 " .. group.category)
+      categoryBtn.setText("📂 " + group.category) -- แก้ไขเครื่องหมายเชื่อมข้อความให้ปลอดภัยใน Lua
       categoryBtn.setBackgroundColor(0xFF222222)
       categoryBtn.setTextColor(0xFF00FF00)
       local subContainer = LinearLayout(activity)
@@ -251,12 +258,21 @@ local function showLauncherUI(activity, rootLayout)
         if data.icon then btn.setCompoundDrawables(data.icon, nil, nil, nil); btn.setCompoundDrawablePadding(20) end
         btn.setText(data.installed and game.name or (game.name .. "\n(กรุณาติดตั้งเกม)"))
         btn.setBackgroundColor(data.installed and Color.parseColor(game.color) or 0xFF555555)
-        -- เพิ่มลูกเล่นเสียงพูดตรงปุ่มกดเข้าเกม
+        
+        -- แก้ไขปุ่มกดเข้าเกมให้หน่วงเวลาเล็กน้อยเพื่อให้เสียงพูดทันเปล่งออกมา
         btn.setOnClickListener(function()
-          if tts and data.installed then
-            tts.speak("กำลังเปิด " .. game.name, TextToSpeech.QUEUE_FLUSH, nil, nil)
+          if data.installed then
+            if isTTSReady and tts then
+              tts.speak("กำลังเปิด " .. game.name, TextToSpeech.QUEUE_FLUSH, nil, nil)
+            end
+            
+            -- หน่วงเวลา 350 มิลลิวินาที ให้เสียงพูดเริ่มออกมาก่อน ค่อยสลับหน้าจอไปเปิดเกม
+            task(350, function()
+              activity.startActivity(activity.getPackageManager().getLaunchIntentForPackage(game.pkg))
+            end)
+          else
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" .. game.pkg)))
           end
-          activity.startActivity(data.installed and activity.getPackageManager().getLaunchIntentForPackage(game.pkg) or Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" .. game.pkg)))
         end)
         
         subContainer.addView(btn)
