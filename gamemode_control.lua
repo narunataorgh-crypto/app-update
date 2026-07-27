@@ -212,18 +212,18 @@ local function showLauncherUI(activity, rootLayout)
 
   local gameCache = {}
 
-  -- สร้างระบบเสียงพูด TextToSpeech (ปรับปรุงใหม่ให้เช็คความพร้อม)
+  -- สร้างระบบเสียงพูด TextToSpeech (แก้ไขวิธีเรียกใช้งาน Locale ให้ถูกต้อง)
   import "android.speech.tts.TextToSpeech"
+  import "java.util.Locale"
   local tts = nil
   local isTTSReady = false
 
   tts = TextToSpeech(activity, TextToSpeech.OnInitListener({
     onInit = function(status)
       if status == TextToSpeech.SUCCESS then
-        -- กำหนดภาษา (หากภาษาไทยในเครื่องไม่รองรับ ระบบจะ fallback ไปภาษาอังกฤษอัตโนมัติ)
-        local result = tts.setLanguage(java.util.Locale("th", "TH"))
+        local result = tts.setLanguage(Locale.THAI)
         if result == TextToSpeech.LANG_MISSING_DATA or result == TextToSpeech.LANG_NOT_SUPPORTED then
-          tts.setLanguage(java.util.Locale.US)
+          tts.setLanguage(Locale.US)
         end
         isTTSReady = true
       end
