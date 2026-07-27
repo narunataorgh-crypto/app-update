@@ -351,10 +351,12 @@ function gamemode.toggle(activity, isCurrentlyActive, rootLayout)
 
     videoView.setOnPreparedListener(MediaPlayer.OnPreparedListener({
       onPrepared = function(mp)
-        local videoWidth = tonumber(mp.getVideoWidth()) or 1
-        local videoHeight = tonumber(mp.getVideoHeight()) or 1
-        local screenWidth = tonumber(activity.getWindowManager().getDefaultDisplay().getWidth()) or 1080
-        local screenHeight = tonumber(activity.getWindowManager().getDefaultDisplay().getHeight()) or 1920
+        local videoWidth = tonumber(tostring(mp.getVideoWidth())) or 1
+        local videoHeight = tonumber(tostring(mp.getVideoHeight())) or 1
+        
+        local display = activity.getWindowManager().getDefaultDisplay()
+        local screenWidth = tonumber(tostring(display.getWidth())) or 1080
+        local screenHeight = tonumber(tostring(display.getHeight())) or 1920
 
         local scaleX = screenWidth / videoWidth
         local scaleY = screenHeight / videoHeight
