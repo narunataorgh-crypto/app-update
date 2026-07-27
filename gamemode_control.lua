@@ -212,6 +212,17 @@ local function showLauncherUI(activity, rootLayout)
 
   local gameCache = {}
 
+  -- สร้างระบบเสียงพูด TextToSpeech ตรงนี้
+  import "android.speech.tts.TextToSpeech"
+  local tts = nil
+  tts = TextToSpeech(activity, TextToSpeech.OnInitListener({
+    onInit = function(status)
+      if status == TextToSpeech.SUCCESS then
+        tts.setLanguage(java.util.Locale("th", "TH"))
+      end
+    end
+  }))
+
   local function renderGames()
     for _, group in ipairs(gameData) do
       local categoryBtn = Button(activity)
@@ -240,9 +251,14 @@ local function showLauncherUI(activity, rootLayout)
         if data.icon then btn.setCompoundDrawables(data.icon, nil, nil, nil); btn.setCompoundDrawablePadding(20) end
         btn.setText(data.installed and game.name or (game.name .. "\n(กรุณาติดตั้งเกม)"))
         btn.setBackgroundColor(data.installed and Color.parseColor(game.color) or 0xFF555555)
+        -- เพิ่มลูกเล่นเสียงพูดตรงปุ่มกดเข้าเกม
         btn.setOnClickListener(function()
+          if tts and data.installed then
+            tts.speak("กำลังเปิด " .. game.name, TextToSpeech.QUEUE_FLUSH, nil, nil)
+          end
           activity.startActivity(data.installed and activity.getPackageManager().getLaunchIntentForPackage(game.pkg) or Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" .. game.pkg)))
         end)
+        
         subContainer.addView(btn)
       end
       gameContainer.addView(categoryBtn)
